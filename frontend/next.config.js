@@ -9,7 +9,10 @@ const nextConfig = {
         ],
     },
     async rewrites() {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:3000';
+        // Production: Elest.io, Local dev: localhost:3000
+        const backendUrl = process.env.NODE_ENV === 'production'
+            ? 'https://mooderi-u26413.vm.elestio.app'
+            : (process.env.BACKEND_URL || 'http://127.0.0.1:3000');
         return [
             {
                 // Proxy API calls to Node.js backend
