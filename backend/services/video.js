@@ -7,7 +7,7 @@ require('dotenv').config();
 // In-memory job store
 const jobs = {};
 
-const MODAL_VIDEO_ENDPOINT = process.env.MODAL_VIDEO_ENDPOINT || "https://theoaintern--moodboard-video-processor-process-video-api.modal.run";
+const MODAL_VIDEO_ENDPOINT = process.env.MODAL_VIDEO_ENDPOINT || "https://frmwrkd-media--moodboard-video-processor-process-video-api.modal.run";
 
 // Background processing function (fire and forget)
 const processWithModal = async (jobId, videoUrl, qualityMode) => {
