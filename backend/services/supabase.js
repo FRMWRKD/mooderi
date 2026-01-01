@@ -1,0 +1,59 @@
+
+require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error("Missing SUPABASE_URL or SUPABASE_KEY");
+}
+
+// Client for regular operations (respects RLS)
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Admin client for bypass operations (if key available)
+const supabaseAdmin = supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : supabase;
+
+const getPublicImages = async (limit = 50, sortBy = 'newest') => {
+    try {
+        if (sortBy === 'ranked') {
+            const { data, error } = await supabase.rpc('get_ranked_images', {
+                limit_count: limit,
+                offset_count: 0
+            });
+            if (error) throw error;
+            return data || [];
+        }
+
+        let query = supabase.from('images').select('*').eq('is_public', true);
+
+        if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
+        else if (sortBy === 'popular') query = query.order('likes', { ascending: false });
+        else if (sortBy === 'unpopular') query = query.order('dislikes', { ascending: false });
+        else if (sortBy === 'rating') query = query.order('aesthetic_score', { ascending: false });
+
+        const { data, error } = await query.limit(limit);
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error("Error fetching images:", error);
+        return [];
+    }
+};
+
+const getImage = async (id) => {
+    const { data, error } = await supabase.from('images').select('*').eq('id', id).single();
+    if (error) return null;
+    return data;
+};
+
+module.exports = {
+    supabase,
+    supabaseAdmin,
+    getPublicImages,
+    getImage
+};
