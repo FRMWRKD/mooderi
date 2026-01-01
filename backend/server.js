@@ -15,6 +15,27 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Get public images (homepage)
+app.get('/api/images', async (req, res) => {
+    const sort = req.query.sort || 'newest';
+    let limit = parseInt(req.query.limit || 50);
+    const offset = parseInt(req.query.offset || 0);
+    if (limit > 100) limit = 100;
+
+    try {
+        const images = await getPublicImages(limit, sort);
+        res.json({
+            images: images || [],
+            count: (images || []).length,
+            offset: offset,
+            has_more: (images || []).length >= limit
+        });
+    } catch (e) {
+        console.error("Images error:", e);
+        res.status(500).json({ error: e.message, images: [] });
+    }
+});
+
 // Public Images
 app.get('/api/search', async (req, res) => {
     const query = (req.query.q || '').trim();
