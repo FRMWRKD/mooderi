@@ -9,11 +9,12 @@ const nextConfig = {
         ],
     },
     async rewrites() {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:3000';
         return [
             {
-                // Proxy API calls to Flask backend
+                // Proxy API calls to Node.js backend
                 source: '/api/:path*',
-                destination: 'http://127.0.0.1:8000/api/:path*',
+                destination: `${backendUrl}/api/:path*`,
             },
         ];
     },
