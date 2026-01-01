@@ -21,12 +21,21 @@ const supabaseAdmin = supabaseServiceKey
 const getPublicImages = async (limit = 50, sortBy = 'newest') => {
     try {
         if (sortBy === 'ranked') {
-            const { data, error } = await supabase.rpc('get_ranked_images', {
-                limit_count: limit,
-                offset_count: 0
-            });
-            if (error) throw error;
-            return data || [];
+            try {
+                const { data, error } = await supabase.rpc('get_ranked_images', {
+                    limit_count: limit,
+                    offset_count: 0
+                });
+                if (!error && data && data.length > 0) {
+                    return data;
+                }
+                // Fallback to newest if ranked fails or is empty
+                console.log("Ranked RPC failed or empty, falling back to newest");
+            } catch (rpcError) {
+                console.log("Ranked RPC error, falling back:", rpcError.message);
+            }
+            // Fall through to 'newest'
+            sortBy = 'newest';
         }
 
         let query = supabase.from('images').select('*').eq('is_public', true);
