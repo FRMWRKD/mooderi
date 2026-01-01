@@ -1,0 +1,504 @@
+{
+  "url": "https://www.youtube.com/watch?v=ucuL5-dyFzs",
+  "started_at": "2025-12-17T16:29:14.858321",
+  "stages": {
+    "download": {
+      "message": "Video downloaded",
+      "progress": 25
+    },
+    "scenes": {
+      "message": "Found 20 scenes",
+      "progress": 40
+    },
+    "frames": {
+      "message": "Extracted 17 frames",
+      "progress": 55
+    },
+    "analysis": {
+      "message": "Analysis complete for 17 frames",
+      "progress": 90
+    },
+    "save": {
+      "message": "Saving results...",
+      "progress": 95
+    }
+  },
+  "frames": [
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0001.jpg",
+      "scene_index": 1,
+      "timestamp": 6.381374999999999,
+      "scene_start": 6.25625,
+      "scene_end": 8.675333333333333,
+      "prompt": "Blurred hands clapping in motion, soft pastel home interior, pink and teal tones, shallow depth of field, cinematic grainy texture, warm natural window light, joyful celebratory mood, indie film aesthetic --ar 16:9",
+      "colors": [
+        "#191616",
+        "#a17a7b",
+        "#71514f",
+        "#405b54",
+        "#858c8b",
+        "#6d8578"
+      ],
+      "tags": [
+        "adult",
+        "body part",
+        "face",
+        "female",
+        "finger",
+        "hand",
+        "head",
+        "holding hands",
+        "indoors",
+        "interior design"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0002.jpg",
+      "scene_index": 2,
+      "timestamp": 8.800458333333333,
+      "scene_start": 8.675333333333333,
+      "scene_end": 12.345666666666666,
+      "prompt": "African American mother and child playing hand games on brick porch steps, golden hour natural light, harsh shadows, vibrant warm colors, teal house, cinematic film still, joyful family moment, documentary style --ar 16:9",
+      "colors": [
+        "#bba9a0",
+        "#181814",
+        "#706158",
+        "#44594d",
+        "#769988",
+        "#75878d"
+      ],
+      "tags": [
+        "adult",
+        "affection",
+        "body part",
+        "child",
+        "clothing",
+        "face",
+        "family",
+        "female",
+        "hand",
+        "happy"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0003.jpg",
+      "scene_index": 3,
+      "timestamp": 12.470791666666667,
+      "scene_start": 12.345666666666666,
+      "scene_end": 16.599916666666665,
+      "prompt": "Young child with colorful hair accessories and beads, soft indoor lighting, pink clothing, warm browns and pastels, casual home video style, tender innocent moment, nostalgic 2000s camcorder aesthetic --ar 16:9",
+      "colors": [
+        "#b5aaad",
+        "#1e1414",
+        "#959f89",
+        "#82645c",
+        "#556048",
+        "#927c9b"
+      ],
+      "tags": [
+        "balloon",
+        "doll",
+        "face",
+        "flower",
+        "hair",
+        "happy",
+        "head",
+        "hugging",
+        "people",
+        "person"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0004.jpg",
+      "scene_index": 4,
+      "timestamp": 16.725041666666666,
+      "scene_start": 16.599916666666665,
+      "scene_end": 26.151124999999997,
+      "prompt": "Young girl in pink hoodie with colorful hair clips on sunny porch, natural outdoor lighting, vibrant colors, home video aesthetic, candid joyful mood, early 2000s camcorder style, shallow depth of field with bokeh trees --ar 16:9",
+      "colors": [
+        "#292e26",
+        "#c7c8bd",
+        "#888979",
+        "#ad6c7d",
+        "#7d5d5b",
+        "#ae97a7"
+      ],
+      "tags": [
+        "american football",
+        "chair",
+        "child",
+        "clothing",
+        "coat",
+        "cute",
+        "face",
+        "fair weather",
+        "fashion",
+        "female"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0005.jpg",
+      "scene_index": 5,
+      "timestamp": 26.276249999999997,
+      "scene_start": 26.151124999999997,
+      "scene_end": 29.154124999999997,
+      "prompt": "Candid outdoor portrait, woman in white hoodie smiling, soft natural daylight, warm golden tones, shallow depth of field, bokeh background, cinematic film aesthetic, joyful intimate mood, lifestyle photography --ar 16:9",
+      "colors": [
+        "#9c8f82",
+        "#0b0a09",
+        "#c4c7c5",
+        "#512b2a",
+        "#58524c",
+        "#cac4a6"
+      ],
+      "tags": [
+        "adult",
+        "face",
+        "female",
+        "happy",
+        "head",
+        "laughing",
+        "man",
+        "nature",
+        "outdoors",
+        "people"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0006.jpg",
+      "scene_index": 6,
+      "timestamp": 29.279249999999998,
+      "scene_start": 29.154124999999997,
+      "scene_end": 31.489791666666665,
+      "prompt": "Ground-level POV of children's feet walking on dirt path, soft overexposed daylight, washed out beige tones with pink and blue clothing accents, nostalgic home video aesthetic, dreamy hazy mood, vintage camcorder style --ar 16:9",
+      "colors": [
+        "#a69d85",
+        "#130d0e",
+        "#573334",
+        "#625c5f",
+        "#736c34",
+        "#afc3c4"
+      ],
+      "tags": [
+        "adult",
+        "baby",
+        "blur",
+        "body part",
+        "child",
+        "face",
+        "fair weather",
+        "foot",
+        "girl",
+        "hand"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0007.jpg",
+      "scene_index": 7,
+      "timestamp": 31.614916666666666,
+      "scene_start": 31.489791666666665,
+      "scene_end": 36.45308333333333,
+      "prompt": "Two people sitting on brick porch steps of colorful house, warm afternoon sunlight, turquoise and yellow siding, white railings, planters with greenery, low angle ground perspective, cinematic film still, nostalgic suburban mood, soft natural lighting --ar 16:9",
+      "colors": [
+        "#191714",
+        "#b09a8a",
+        "#7a6a56",
+        "#505f52",
+        "#91958b",
+        "#8d8b8c"
+      ],
+      "tags": [
+        "body part",
+        "child",
+        "clothing",
+        "doorway",
+        "face",
+        "fallen person",
+        "family",
+        "footwear",
+        "hand",
+        "head"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0008.jpg",
+      "scene_index": 8,
+      "timestamp": 36.57820833333333,
+      "scene_start": 36.45308333333333,
+      "scene_end": 38.95558333333333,
+      "prompt": "Blurred dreamy garden view through window, soft bokeh, green and golden tones, vintage film grain, hazy sunlight, nostalgic melancholic mood, impressionistic style, shallow depth of field --ar 16:9",
+      "colors": [
+        "#272921",
+        "#d3d6cc",
+        "#89876b",
+        "#ad947e",
+        "#9ba3ab",
+        "#746b53"
+      ],
+      "tags": [
+        "blur",
+        "face",
+        "fair weather",
+        "fall",
+        "focus",
+        "head",
+        "horizontal",
+        "indoors",
+        "interior design",
+        "leaf"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0009.jpg",
+      "scene_index": 9,
+      "timestamp": 39.08070833333333,
+      "scene_start": 38.95558333333333,
+      "scene_end": 39.83145833333333,
+      "prompt": "Young woman in pink hoodie, twisted hairstyle with colorful accessories, natural outdoor lighting, soft focus green foliage background, vibrant colors, cinematic film style, joyful carefree mood, music video aesthetic --ar 16:9",
+      "colors": [
+        "#695c4d",
+        "#b7b49a",
+        "#0b0b0a",
+        "#ac6e7a",
+        "#9a94a3",
+        "#5c1d2b"
+      ],
+      "tags": [
+        "adult",
+        "ball",
+        "cheerful",
+        "child",
+        "cricket",
+        "cricket ball",
+        "face",
+        "fair weather",
+        "fall",
+        "female"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0010.jpg",
+      "scene_index": 10,
+      "timestamp": 39.95658333333333,
+      "scene_start": 39.83145833333333,
+      "scene_end": 40.45708333333333,
+      "prompt": "Young woman clapping outdoors, white hoodie, natural daylight, green house siding, trees in background, cinematic film grain, warm nostalgic tones, shot from low angle, joyful mood, indie music video aesthetic --ar 16:9",
+      "colors": [
+        "#b4aaa4",
+        "#1e231e",
+        "#7a6c5e",
+        "#4b695a",
+        "#939394",
+        "#939c91"
+      ],
+      "tags": [
+        "adult",
+        "child",
+        "face",
+        "happy",
+        "head",
+        "laughing",
+        "outdoors",
+        "people",
+        "person",
+        "portrait"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0011.jpg",
+      "scene_index": 11,
+      "timestamp": 40.58220833333333,
+      "scene_start": 40.45708333333333,
+      "scene_end": 45.128416666666666,
+      "prompt": "Two women chatting on brick porch steps, bright warm sun, teal house, low angle wide shot, subtle vignette, grainy early 2000s music video still, candid, nostalgic --ar 16:9",
+      "colors": [
+        "#1a1714",
+        "#b1998e",
+        "#786857",
+        "#908f83",
+        "#4f5f53",
+        "#83828c"
+      ],
+      "tags": [
+        "adult",
+        "child",
+        "clothing",
+        "face",
+        "family",
+        "footwear",
+        "head",
+        "home",
+        "house",
+        "jeans"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0012.jpg",
+      "scene_index": 12,
+      "timestamp": 45.25354166666666,
+      "scene_start": 45.128416666666666,
+      "scene_end": 46.921875,
+      "prompt": "blurry person in pink hoodie, side view, extreme bokeh foliage background, soft natural light, shallow depth of field, subtle motion blur, grainy, lo-fi, candid, warm muted colors, indie film still, music video aesthetic --ar 16:9",
+      "colors": [
+        "#b3b38a",
+        "#1f1814",
+        "#969a77",
+        "#7b7658",
+        "#5a5d40",
+        "#748a8d"
+      ],
+      "tags": [
+        "baseball",
+        "crying",
+        "face",
+        "fall",
+        "flora",
+        "happy",
+        "head",
+        "horizontal",
+        "leaf",
+        "nature"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0013.jpg",
+      "scene_index": 13,
+      "timestamp": 47.047,
+      "scene_start": 46.921875,
+      "scene_end": 48.13141666666667,
+      "prompt": "Joyful Black woman, smiling, clapping, soft golden hour light, shallow depth of field, warm desaturated tones, teal siding, lush green bokeh, cinematic still, natural portrait, film grain, 35mm lens --ar 16:9",
+      "colors": [
+        "#2c2f29",
+        "#cec7bc",
+        "#8a7d72",
+        "#657e6e",
+        "#a2a3a4",
+        "#a1adac"
+      ],
+      "tags": [
+        "adult",
+        "face",
+        "facial expression",
+        "female",
+        "happiness",
+        "happy",
+        "head",
+        "horizontal",
+        "indoors",
+        "laughing"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0014.jpg",
+      "scene_index": 14,
+      "timestamp": 48.256541666666664,
+      "scene_start": 48.13141666666667,
+      "scene_end": 49.88316666666666,
+      "prompt": "Two people sitting on brick porch steps playing hand games, warm afternoon sunlight, turquoise house exterior, white railings, potted plants, cinematic music video style, joyful nostalgic mood, shallow depth of field, natural lighting, vibrant colors --ar 16:9",
+      "colors": [
+        "#a99491",
+        "#161614",
+        "#73685f",
+        "#779588",
+        "#45695c",
+        "#72868d"
+      ],
+      "tags": [
+        "adult",
+        "child",
+        "face",
+        "female",
+        "girl",
+        "happy",
+        "head",
+        "love",
+        "one",
+        "outdoors"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0015.jpg",
+      "scene_index": 15,
+      "timestamp": 50.00829166666666,
+      "scene_start": 49.88316666666666,
+      "scene_end": 50.75904166666666,
+      "prompt": "Two people on sunny porch with white railing, lush green trees background, natural daylight, warm tones, casual home video aesthetic, candid documentary style, joyful intimate mood, nostalgic family film --ar 16:9",
+      "colors": [
+        "#c0b39f",
+        "#1f1f18",
+        "#82715a",
+        "#95a087",
+        "#586349",
+        "#879099"
+      ],
+      "tags": [
+        "adult",
+        "body part",
+        "child",
+        "clothing",
+        "face",
+        "female",
+        "fun",
+        "girl",
+        "hand",
+        "head"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0016.jpg",
+      "scene_index": 16,
+      "timestamp": 50.88416666666666,
+      "scene_start": 50.75904166666666,
+      "scene_end": 51.42637499999999,
+      "prompt": "Close-up hands giving high-five, soft focus background, warm nostalgic tones, pink and blue clothing, vintage home video aesthetic, grainy film texture, candid joyful moment, shallow depth of field, dreamy atmosphere --ar 16:9",
+      "colors": [
+        "#ad9e8a",
+        "#110b0d",
+        "#56242e",
+        "#58585e",
+        "#726634",
+        "#945762"
+      ],
+      "tags": [
+        "adult",
+        "arm",
+        "body part",
+        "face",
+        "finger",
+        "friendship",
+        "hand",
+        "head",
+        "holding hands",
+        "horizontal"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_162914_frame_0017.jpg",
+      "scene_index": 17,
+      "timestamp": 51.55149999999999,
+      "scene_start": 51.42637499999999,
+      "scene_end": 56.51479166666666,
+      "prompt": "",
+      "colors": [
+        "#2f2623",
+        "#c4be95",
+        "#927a69",
+        "#a3aa8a",
+        "#6d775d",
+        "#979b9d"
+      ],
+      "tags": []
+    }
+  ],
+  "success": true,
+  "video_info": {
+    "success": true,
+    "video_path": "app/static/processed/videos/video_20251217_162914.mp4",
+    "title": "TEACHING THE PRO | A\u2019JA WILSON | NIKE",
+    "duration": 61,
+    "thumbnail": "https://i.ytimg.com/vi/ucuL5-dyFzs/maxresdefault.jpg",
+    "uploader": "Nike"
+  },
+  "scene_count": 20,
+  "completed_at": "2025-12-17T16:32:07.048318"
+}

@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container"
+    style="background: none; height: auto; min-height: calc(100vh - 80px); padding: 40px; margin: 0;">
+    <div class="auth-card glass" style="width: 100%; max-width: 600px; padding: 40px;">
+        <div class="auth-header">
+            <h1 style="font-size: 24px;">Upload Content</h1>
+            <p>Add new content to your library</p>
+        </div>
+
+        <!-- Upload Type Tabs -->
+        <div class="upload-tabs" style="display: flex; gap: 8px; margin-bottom: 24px;">
+            <button class="tab-btn active" onclick="selectUploadType('video', this)">
+                <i class="bi bi-film"></i> Video URL
+            </button>
+            <button class="tab-btn" onclick="selectUploadType('image', this)">
+                <i class="bi bi-image"></i> Image URL
+            </button>
+        </div>
+
+        <form class="auth-form" onsubmit="event.preventDefault(); handleUpload();">
+            <!-- URL Input -->
+            <div class="form-group">
+                <label id="url-label">Video URL</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-link-45deg"></i>
+                    <input type="url" id="video-url" placeholder="https://youtube.com/watch?v=..." required>
+                </div>
+                <p id="url-hint" style="font-size: 11px; color: var(--text-tertiary); margin-top: 6px;">Supported:
+                    YouTube, Vimeo,
+                    Direct MP4 links</p>
+            </div>
+
+            <!-- Drag & Drop Zone -->
+            <div class="form-group">
+                <label>Or Upload File</label>
+                <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                    <i class="bi bi-cloud-arrow-up"
+                        style="font-size: 32px; color: var(--accent-blue); margin-bottom: 12px; display: block;"></i>
+                    <p style="font-size: 14px; font-weight: 500;">Click to upload or drag and drop</p>
+                    <p style="font-size: 12px; color: var(--text-tertiary);">MP4, MOV, WEBM until 500MB</p>
+                    <input type="file" id="file-input" accept="video/*" style="display: none;"
+                        onchange="handleFileSelect(this)">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Quality Mode</label>
+                <div style="display: flex; gap: 12px;">
+                    <label class="radio-card active" onclick="selectQuality('medium')">
+                        <input type="radio" name="quality" value="medium" checked style="display: none;">
+                        <span style="display: block; font-weight: 600; font-size: 13px;">Balanced</span>
+                        <span style="font-size: 11px; color: var(--text-tertiary);">Standard extract</span>
+                    </label>
+                    <label class="radio-card" onclick="selectQuality('high')">
+                        <input type="radio" name="quality" value="high" style="display: none;">
+                        <span style="display: block; font-weight: 600; font-size: 13px;">High Detail</span>
+                        <span style="font-size: 11px; color: var(--text-tertiary);">More frames</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Progress Bar (Hidden by default) -->
+            <div id="upload-progress" style="display: none; margin-top: 24px;">
+                <div
+                    style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 500;">
+                    <span>Processing...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div
+                    style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                    <div id="progress-bar"
+                        style="width: 0%; height: 100%; background: var(--accent-blue); transition: width 0.3s ease;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions" style="margin-top: 32px; display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="btn-upload">Start Processing</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .tab-btn {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-subtle);
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+        background: rgba(41, 151, 255, 0.1);
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+    }
+
+    .radio-card {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-subtle);
+        padding: 12px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    .radio-card:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .radio-card.active {
+        background: rgba(41, 151, 255, 0.1);
+        border-color: var(--accent-blue);
+        box-shadow: 0 0 10px rgba(41, 151, 255, 0.1);
+    }
+</style>
+
+<script>
+    let currentUploadType = 'video';
+
+    function selectUploadType(type, btn) {
+        currentUploadType = type;
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        btn.classList.add('active');
+
+        const urlInput = document.getElementById('video-url');
+        const urlLabel = document.getElementById('url-label');
+        const urlHint = document.getElementById('url-hint');
+        const dropZone = document.getElementById('drop-zone').closest('.form-group');
+        const qualitySection = document.querySelector('[data-quality-section]') || document.querySelectorAll('.form-group')[2];
+
+        if (type === 'video') {
+            urlLabel.textContent = 'Video URL';
+            urlInput.placeholder = 'https://youtube.com/watch?v=...';
+            urlHint.textContent = 'Supported: YouTube, Vimeo, Direct MP4 links';
+            if (dropZone) dropZone.style.display = '';
+            if (qualitySection) qualitySection.style.display = '';
+        } else {
+            urlLabel.textContent = 'Image URL';
+            urlInput.placeholder = 'https://example.com/image.jpg';
+            urlHint.textContent = 'Paste any direct image URL (JPG, PNG, WebP)';
+            if (dropZone) dropZone.style.display = 'none';
+            if (qualitySection) qualitySection.style.display = 'none';
+        }
+    }
+
+    function selectQuality(mode) {
+        document.querySelectorAll('.radio-card').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        event.currentTarget.querySelector('input').checked = true;
+    }
+
+    function handleFileSelect(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            document.getElementById('video-url').value = `Local File: ${file.name}`;
+            document.getElementById('video-url').disabled = true;
+        }
+    }
+
+    async function handleUpload() {
+        const btn = document.getElementById('btn-upload');
+        const progress = document.getElementById('upload-progress');
+        const bar = document.getElementById('progress-bar');
+        const pct = document.getElementById('progress-percent');
+        const url = document.getElementById('video-url').value.trim();
+
+        if (!url || url.startsWith('Local File:')) {
+            alert('Please enter a valid URL');
+            return;
+        }
+
+        btn.disabled = true;
+        progress.style.display = 'block';
+
+        if (currentUploadType === 'image') {
+            // Handle image URL - direct upload
+            btn.innerText = "Uploading Image...";
+            bar.style.width = '50%';
+            pct.innerText = '50%';
+
+            try {
+                // TODO: Implement direct image URL upload endpoint
+                alert('Image URL upload coming soon! For now, use video URLs.');
+                btn.disabled = false;
+                btn.innerText = "Start Processing";
+                progress.style.display = 'none';
+            } catch (e) {
+                alert('Error: ' + e.message);
+                btn.disabled = false;
+                btn.innerText = "Start Processing";
+            }
+            return;
+        }
+
+        // Video processing
+        btn.innerText = "Starting...";
+        bar.style.width = '10%';
+        pct.innerText = '10%';
+
+        const qualityMode = document.querySelector('input[name="quality"]:checked')?.value || 'medium';
+
+        try {
+            // Start video processing
+            const response = await fetch('/api/process-video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url, quality_mode: qualityMode })
+            });
+
+            const data = await response.json();
+
+            if (data.already_processed) {
+                alert(data.message);
+                window.location.href = data.redirect_url || '/';
+                return;
+            }
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            const jobId = data.job_id;
+            btn.innerText = "Processing...";
+
+            // Poll for status
+            const pollStatus = async () => {
+                try {
+                    const statusRes = await fetch(`/api/process-video/status/${jobId}`);
+                    const status = await statusRes.json();
+
+                    bar.style.width = status.progress + '%';
+                    pct.innerText = status.progress + '%';
+                    btn.innerText = status.message || "Processing...";
+
+                    if (status.status === 'pending_approval') {
+                        // Frames ready for approval - redirect to approval page or show modal
+                        window.location.href = `/upload?job_id=${jobId}&pending=true`;
+                        return;
+                    } else if (status.status === 'completed') {
+                        alert('Video processed successfully!');
+                        window.location.href = '/videos';
+                        return;
+                    } else if (status.status === 'failed') {
+                        throw new Error(status.message || 'Processing failed');
+                    }
+
+                    // Continue polling
+                    setTimeout(pollStatus, 2000);
+                } catch (e) {
+                    btn.disabled = false;
+                    btn.innerText = "Start Processing";
+                    alert('Error: ' + e.message);
+                }
+            };
+
+            setTimeout(pollStatus, 2000);
+
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerText = "Start Processing";
+            progress.style.display = 'none';
+            alert('Error: ' + e.message);
+        }
+    }
+</script>
+{% endblock %}

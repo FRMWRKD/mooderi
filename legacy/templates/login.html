@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card glass">
+        <div class="auth-header">
+            <div class="logo-icon large">V</div>
+            <h1>Welcome Back</h1>
+            <p>Enter the visual intelligence engine.</p>
+        </div>
+
+        <form class="auth-form">
+            <div class="form-group">
+                <label>Email</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-envelope"></i>
+                    <input type="email" placeholder="director@studio.com">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-lock"></i>
+                    <input type="password" placeholder="••••••••">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="#">Request Access</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        /* Override main content padding for full centering */
+        margin: -40px;
+        background: radial-gradient(circle at top right, rgba(108, 93, 211, 0.1), transparent 40%);
+    }
+
+    .auth-card {
+        width: 400px;
+        padding: 48px;
+        border-radius: 24px;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 32px;
+    }
+
+    .logo-icon.large {
+        width: 48px;
+        height: 48px;
+        font-size: 24px;
+        margin: 0 auto 24px;
+    }
+
+    .auth-header h1 {
+        font-family: var(--font-heading);
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+
+    .auth-header p {
+        color: var(--text-secondary);
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper i {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+    .input-wrapper input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border-color);
+        padding: 12px 16px 12px 48px;
+        border-radius: 12px;
+        color: white;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    .input-wrapper input:focus {
+        border-color: var(--accent);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(108, 93, 211, 0.2);
+        background: rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-block {
+        width: 100%;
+        justify-content: center;
+        padding: 14px;
+        margin-top: 8px;
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .auth-footer a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}

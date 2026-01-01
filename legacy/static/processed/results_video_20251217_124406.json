@@ -1,0 +1,1037 @@
+{
+  "url": "https://www.youtube.com/watch?v=Bcpu-jqAL6w",
+  "started_at": "2025-12-17T12:44:06.869734",
+  "stages": {
+    "download": {
+      "message": "Video downloaded",
+      "progress": 25
+    },
+    "scenes": {
+      "message": "Found 39 scenes",
+      "progress": 40
+    },
+    "frames": {
+      "message": "Extracted 39 frames",
+      "progress": 55
+    },
+    "analysis": {
+      "message": "Analysis complete for 39 frames",
+      "progress": 90
+    },
+    "save": {
+      "message": "Saving results...",
+      "progress": 95
+    }
+  },
+  "frames": [
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0000.jpg",
+      "scene_index": 0,
+      "timestamp": 0.125125,
+      "scene_start": 0.0,
+      "scene_end": 2.2105416666666664,
+      "prompt": "Urban street basketball scene, young player in yellow jersey celebrating, dutch angle low shot, warm natural sunlight, gritty city buildings backdrop, cinematic documentary style, vibrant summer colors, energetic triumphant mood, Nike ad aesthetic --ar 16:9",
+      "colors": [
+        "#1f1815",
+        "#3a3531",
+        "#43321c",
+        "#4c4c4a",
+        "#604c2d"
+      ],
+      "tags": [
+        "adult",
+        "athlete",
+        "basketball",
+        "boy",
+        "competition",
+        "face",
+        "festival",
+        "happy",
+        "head",
+        "male"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0001.jpg",
+      "scene_index": 1,
+      "timestamp": 2.3356666666666666,
+      "scene_start": 2.2105416666666664,
+      "scene_end": 4.004,
+      "prompt": "Street soccer game in urban courtyard, warm afternoon sunlight, earth tones and vibrant jerseys, cinematic documentary style, dynamic mid-action freeze frame, gritty realism, coming-of-age film aesthetic, shallow depth of field --ar 16:9",
+      "colors": [
+        "#221c17",
+        "#2a1c0f",
+        "#3a322c",
+        "#3f3124",
+        "#522c1e"
+      ],
+      "tags": [
+        "action",
+        "adolescence",
+        "adult",
+        "athlete",
+        "ball",
+        "ball game",
+        "basketball",
+        "basketball game",
+        "battle",
+        "bicycle"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0002.jpg",
+      "scene_index": 2,
+      "timestamp": 4.129124999999999,
+      "scene_start": 4.004,
+      "scene_end": 5.630624999999999,
+      "prompt": "Athletic woman in Nike sportswear, purple headband, intense gaze upward, shallow depth of field, cinematic lighting, warm skin tones, cool background blur, sports photography, determined mood, commercial ad aesthetic --ar 16:9",
+      "colors": [
+        "#141e2b",
+        "#1c1818",
+        "#2c1d13",
+        "#3a2e29",
+        "#413125"
+      ],
+      "tags": [
+        "accessories",
+        "active tank",
+        "adult",
+        "athlete",
+        "basketball",
+        "basketball player",
+        "body part",
+        "competition",
+        "determination",
+        "eye"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0003.jpg",
+      "scene_index": 3,
+      "timestamp": 5.755749999999999,
+      "scene_start": 5.630624999999999,
+      "scene_end": 6.715041666666666,
+      "prompt": "Cinematic close-up of exhausted athlete, hands on head, looking down, golden hour side lighting, shallow depth of field, blurred stadium background, warm tones with teal sky, film grain, emotional sports drama aesthetic, Canon cinema camera style --ar 16:9",
+      "colors": [
+        "#382c28",
+        "#402623",
+        "#452821",
+        "#5a5151",
+        "#6f5045"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "determination",
+        "face",
+        "head",
+        "male",
+        "man",
+        "one",
+        "outdoors",
+        "people"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0004.jpg",
+      "scene_index": 4,
+      "timestamp": 6.840166666666666,
+      "scene_start": 6.715041666666666,
+      "scene_end": 7.465791666666666,
+      "prompt": "Athletic runner in starting blocks, low angle shot from ground level, dramatic blue sky, warm sunlight, sports photography, intense focused mood, Nike commercial style, shallow depth of field, cinematic realism --ar 16:9",
+      "colors": [
+        "#091f2c",
+        "#10181b",
+        "#1c313e",
+        "#2e3235",
+        "#47292c"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "american football",
+        "competition",
+        "football",
+        "head",
+        "male",
+        "man",
+        "one",
+        "people"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0005.jpg",
+      "scene_index": 5,
+      "timestamp": 7.590916666666666,
+      "scene_start": 7.465791666666666,
+      "scene_end": 8.842166666666666,
+      "prompt": "Athletic woman in red Nike tank top, slicked back hair, gold necklace, moody cinematic lighting, desaturated teal and red color grade, shallow depth of field, dramatic shadows, contemplative expression, sports documentary aesthetic, arri alexa style --ar 16:9",
+      "colors": [
+        "#121315",
+        "#2c080d",
+        "#333231",
+        "#380b0c",
+        "#3f050b"
+      ],
+      "tags": [
+        "accessories",
+        "active tank",
+        "adult",
+        "athlete",
+        "biceps",
+        "body part",
+        "brawny",
+        "championship",
+        "competition",
+        "determination"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0006.jpg",
+      "scene_index": 6,
+      "timestamp": 8.967291666666666,
+      "scene_start": 8.842166666666666,
+      "scene_end": 12.887875,
+      "prompt": "Bald man with glasses firing a starter pistol, smoke, blurred athletic background with legs & strong shadows, harsh daylight, dynamic angle, medium close-up, shallow DOF, desaturated cinematic colors, pops of red/blue, film grain, intense action --ar 16:9",
+      "colors": [
+        "#563429",
+        "#595850",
+        "#635043",
+        "#6c4a3e",
+        "#7b7f74"
+      ],
+      "tags": [
+        "accessories",
+        "adult",
+        "blur",
+        "clothing",
+        "drag race",
+        "face",
+        "festival",
+        "girl",
+        "glasses",
+        "glove"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0007.jpg",
+      "scene_index": 7,
+      "timestamp": 13.013,
+      "scene_start": 12.887875,
+      "scene_end": 14.806458333333332,
+      "prompt": "Aerial shot of athletic man climbing rocky cliff above turquoise ocean water, looking up at camera with determined expression, natural sunlight, deep teal and tan colors, GoPro style, adventurous mood, action sports photography --ar 16:9",
+      "colors": [
+        "#193742",
+        "#1b1a1b",
+        "#1b3d47",
+        "#1c3b3e",
+        "#25363b"
+      ],
+      "tags": [
+        "adult",
+        "bathing",
+        "clothing",
+        "diving",
+        "face",
+        "head",
+        "leisure",
+        "leisure activities",
+        "nature",
+        "one"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0008.jpg",
+      "scene_index": 8,
+      "timestamp": 14.931583333333332,
+      "scene_start": 14.806458333333332,
+      "scene_end": 16.558208333333333,
+      "prompt": "Dark underwater scene with bioluminescent creatures, deep blue-green lighting, ethereal glow, aerial top-down view, mysterious ocean depths, cinematic nature documentary style, Planet Earth aesthetic --ar 16:9",
+      "colors": [
+        "#012524",
+        "#02191f",
+        "#032830",
+        "#041a2e",
+        "#041a43"
+      ],
+      "tags": [
+        "adult",
+        "adventure",
+        "boat",
+        "deep",
+        "exploration",
+        "fish",
+        "leisure activities",
+        "light",
+        "male",
+        "man"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0009.jpg",
+      "scene_index": 9,
+      "timestamp": 16.683333333333334,
+      "scene_start": 16.558208333333333,
+      "scene_end": 18.059708333333333,
+      "prompt": "NFL player in midnight green Eagles uniform, dramatic stadium lighting, shallow depth of field, cinematic sports photography, intense competitive mood, motion blur background, professional broadcast quality --ar 16:9",
+      "colors": [
+        "#171815",
+        "#333632",
+        "#445b4e",
+        "#535851",
+        "#667e71"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "american football",
+        "athlete",
+        "ball game",
+        "competition",
+        "face",
+        "face mask",
+        "football",
+        "football helmet"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0010.jpg",
+      "scene_index": 10,
+      "timestamp": 18.184833333333334,
+      "scene_start": 18.059708333333333,
+      "scene_end": 19.019,
+      "prompt": "Close-up portrait from behind, dark hair against bright sky, motion blur, sun-drenched outdoor setting, teal and warm tones, handheld camera aesthetic, dreamy nostalgic mood, indie film cinematography, shallow depth of field --ar 16:9",
+      "colors": [
+        "#14171b",
+        "#2a312e",
+        "#362f1e",
+        "#415b56",
+        "#4b5a3c"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "american football",
+        "baseball",
+        "basketball",
+        "beach",
+        "blur",
+        "dawn",
+        "face",
+        "female"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0011.jpg",
+      "scene_index": 11,
+      "timestamp": 19.144125,
+      "scene_start": 19.019,
+      "scene_end": 19.894875,
+      "prompt": "Dynamic low-angle shot of skateboarder mid-air trick, sun flare, palm trees, blue sky gradient, action sports photography, vibrant saturated colors, energetic mood, RED camera aesthetic, motion freeze frame --ar 16:9",
+      "colors": [
+        "#131c1e",
+        "#293638",
+        "#376776",
+        "#465658",
+        "#507a87"
+      ],
+      "tags": [
+        "action",
+        "balance",
+        "boardsport",
+        "clothing",
+        "competition",
+        "extreme sport",
+        "face",
+        "footwear",
+        "gymnastic apparatus",
+        "head"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0012.jpg",
+      "scene_index": 12,
+      "timestamp": 20.02,
+      "scene_start": 19.894875,
+      "scene_end": 20.979291666666665,
+      "prompt": "Close-up portrait of athlete in yellow and green jersey, shallow depth of field, cinematic sports photography, muted teal and yellow color grade, natural stadium lighting, dramatic bokeh background, film grain texture, documentary realism style --ar 16:9",
+      "colors": [
+        "#1b1a17",
+        "#30312d",
+        "#398752",
+        "#465d58",
+        "#47643d"
+      ],
+      "tags": [
+        "adult",
+        "athlete",
+        "body part",
+        "competition",
+        "cricket",
+        "face",
+        "football",
+        "head",
+        "jersey",
+        "male"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0013.jpg",
+      "scene_index": 13,
+      "timestamp": 21.104416666666665,
+      "scene_start": 20.979291666666665,
+      "scene_end": 22.981291666666664,
+      "prompt": "Low-angle dynamic shot of soccer player in yellow and blue uniform mid-kick, dramatic stadium lighting, vibrant green pitch, cinematic sports photography style, intense athletic energy, wide-angle lens distortion, hyperrealistic digital render --ar 16:9",
+      "colors": [
+        "#12354c",
+        "#465830",
+        "#63a3ac",
+        "#6b7873",
+        "#7a7f3e"
+      ],
+      "tags": [
+        "action energy",
+        "athlete",
+        "ball",
+        "ball game",
+        "baseball",
+        "baseball (ball)",
+        "champion",
+        "championship",
+        "competition",
+        "face"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0014.jpg",
+      "scene_index": 14,
+      "timestamp": 23.106416666666664,
+      "scene_start": 22.981291666666664,
+      "scene_end": 24.065708333333333,
+      "prompt": "Brazilian soccer player in yellow jersey taking a shot on goal, goalkeeper in turquoise defending, packed stadium crowd background, cinematic lighting, vibrant sports photography, motion blur, dramatic moment, FIFA video game style realism, broadcast camera angle --ar 16:9",
+      "colors": [
+        "#333938",
+        "#3f5d5d",
+        "#4b5a5c",
+        "#4d663e",
+        "#5b7874"
+      ],
+      "tags": [
+        "action",
+        "action energy",
+        "adult",
+        "athlete",
+        "ball",
+        "ball game",
+        "clothing",
+        "competition",
+        "competition event",
+        "cup"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0015.jpg",
+      "scene_index": 15,
+      "timestamp": 24.190833333333334,
+      "scene_start": 24.065708333333333,
+      "scene_end": 26.276249999999997,
+      "prompt": "Over-the-shoulder shot of person's back of head with short hair, shallow depth of field, warm golden bokeh lighting, cinematic film grain, intimate perspective, muted earth tones, professional photography, contemplative mood, Blade Runner 2049 style --ar 16:9",
+      "colors": [
+        "#433b34",
+        "#4c3929",
+        "#533325",
+        "#625652",
+        "#635442"
+      ],
+      "tags": [
+        "adult",
+        "animal",
+        "athlete",
+        "beach",
+        "bird",
+        "blur",
+        "city",
+        "competition",
+        "face",
+        "facial expression"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0016.jpg",
+      "scene_index": 16,
+      "timestamp": 26.401374999999998,
+      "scene_start": 26.276249999999997,
+      "scene_end": 27.861166666666666,
+      "prompt": "Overhead aerial shot of professional tennis player mid-serve on blue court, dynamic action, athletic motion blur, teal and red color palette, high-angle sports photography, intense competitive energy, Nike commercial style --ar 16:9",
+      "colors": [
+        "#0b2133",
+        "#163749",
+        "#191414",
+        "#2d5365",
+        "#306371"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "competition",
+        "face",
+        "female",
+        "head",
+        "hockey",
+        "one",
+        "people",
+        "person"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0017.jpg",
+      "scene_index": 17,
+      "timestamp": 27.986291666666666,
+      "scene_start": 27.861166666666666,
+      "scene_end": 29.362666666666666,
+      "prompt": "",
+      "colors": [],
+      "tags": []
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0018.jpg",
+      "scene_index": 18,
+      "timestamp": 29.487791666666666,
+      "scene_start": 29.362666666666666,
+      "scene_end": 30.82245833333333,
+      "prompt": "Brazilian soccer player celebrating goal, cinematic sports photography, yellow jersey with green trim, shallow depth of field, blurred crowd background in red, dramatic natural stadium lighting, emotional triumph moment, Nike commercial style --ar 16:9",
+      "colors": [
+        "#171010",
+        "#1c384b",
+        "#280e0f",
+        "#31566d",
+        "#316070"
+      ],
+      "tags": [
+        "adult",
+        "athlete",
+        "ball",
+        "basketball",
+        "boy",
+        "child",
+        "competition",
+        "education",
+        "face",
+        "female"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0019.jpg",
+      "scene_index": 19,
+      "timestamp": 30.94758333333333,
+      "scene_start": 30.82245833333333,
+      "scene_end": 31.69833333333333,
+      "prompt": "Intense cricket player in batting helmet with face guard, cinematic sports lighting, orange and teal color grading, shallow depth of field, determined focused expression, stadium bokeh background, high-end commercial photography style --ar 16:9",
+      "colors": [
+        "#1b1616",
+        "#1d3c54",
+        "#274f6a",
+        "#2d1415",
+        "#372b28"
+      ],
+      "tags": [
+        "adult",
+        "american football",
+        "athlete",
+        "baseball",
+        "bat-and-ball games",
+        "child",
+        "competition",
+        "cricket",
+        "face",
+        "football"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0020.jpg",
+      "scene_index": 20,
+      "timestamp": 31.82345833333333,
+      "scene_start": 31.69833333333333,
+      "scene_end": 32.907875,
+      "prompt": "Cricket batsman in blue uniform with orange accents at crease, golden hour stadium lighting, packed crowd background, cinematic sports photography, shallow depth of field, determined athletic mood, Bollywood sports drama style --ar 16:9",
+      "colors": [
+        "#18364c",
+        "#191b1e",
+        "#306173",
+        "#385c55",
+        "#457685"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "american football",
+        "athlete",
+        "ball",
+        "ballplayer",
+        "baseball",
+        "baseball bat",
+        "bat-and-ball games",
+        "catcher"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0021.jpg",
+      "scene_index": 21,
+      "timestamp": 33.032999999999994,
+      "scene_start": 32.907875,
+      "scene_end": 34.159124999999996,
+      "prompt": "Professional tennis player mid-swing on blue court, dramatic low angle shot, teal and red color grading, sharp shadow on ground, cinematic sports photography, dynamic athletic motion, packed stadium background, golden hour lighting, Nike commercial style --ar 16:9",
+      "colors": [
+        "#303536",
+        "#3c6571",
+        "#3e6468",
+        "#4d7781",
+        "#4e5454"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "animal",
+        "athlete",
+        "ball",
+        "bear",
+        "competition",
+        "court",
+        "face",
+        "group together"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0022.jpg",
+      "scene_index": 22,
+      "timestamp": 34.28424999999999,
+      "scene_start": 34.159124999999996,
+      "scene_end": 36.161125,
+      "prompt": "Indoor sports arena volleyball spike, motion blur action shot, dramatic overhead lighting with ceiling fixtures, red and white team jerseys, dark gymnasium atmosphere, broadcast camera style, intense athletic competition, sports photography realism --ar 16:9",
+      "colors": [
+        "#555550",
+        "#5b553b",
+        "#74756f",
+        "#797559",
+        "#969891"
+      ],
+      "tags": [
+        "adult",
+        "aircraft",
+        "airplane",
+        "airport",
+        "athlete",
+        "blur",
+        "championship",
+        "city",
+        "competition",
+        "face"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0023.jpg",
+      "scene_index": 23,
+      "timestamp": 36.286249999999995,
+      "scene_start": 36.161125,
+      "scene_end": 37.787749999999996,
+      "prompt": "Female basketball player in red jersey mid-game, shallow depth of field, cinematic sports photography, dramatic arena lighting, muted color palette with red accents, professional broadcast camera, intense competitive mood, ESPN documentary style --ar 16:9",
+      "colors": [
+        "#1d1c19",
+        "#301114",
+        "#333631",
+        "#3f3728",
+        "#4a2b2d"
+      ],
+      "tags": [
+        "active tank",
+        "adult",
+        "athlete",
+        "ball",
+        "basketball",
+        "competition",
+        "face",
+        "head",
+        "indoors",
+        "jersey"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0024.jpg",
+      "scene_index": 24,
+      "timestamp": 37.91287499999999,
+      "scene_start": 37.787749999999996,
+      "scene_end": 39.58120833333333,
+      "prompt": "",
+      "colors": [],
+      "tags": []
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0025.jpg",
+      "scene_index": 25,
+      "timestamp": 39.706333333333326,
+      "scene_start": 39.58120833333333,
+      "scene_end": 41.08270833333333,
+      "prompt": "Professional tennis court scene, shallow depth of field, yellow-green tennis ball on net, warm natural lighting, clay court surface, blurred crowd background, cinematic sports photography, dramatic bokeh, high-end camera aesthetic, intense competitive mood --ar 16:9",
+      "colors": [
+        "#333430",
+        "#525550",
+        "#72823a",
+        "#738b28",
+        "#757973"
+      ],
+      "tags": [
+        "athlete",
+        "ball",
+        "ball game",
+        "baseball",
+        "competition",
+        "court",
+        "equipment",
+        "game equipment",
+        "individual sport",
+        "leisure"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0026.jpg",
+      "scene_index": 26,
+      "timestamp": 41.207833333333326,
+      "scene_start": 41.08270833333333,
+      "scene_end": 42.5425,
+      "prompt": "Athletes with running blades sprinting, dynamic low angle, strong backlight, golden hour sun flare, cinematic teal & warm colors, inspiring, sports photography --ar 16:9",
+      "colors": [
+        "#523032",
+        "#685b41",
+        "#6d4949",
+        "#734d47",
+        "#7b6a52"
+      ],
+      "tags": [
+        "action",
+        "action energy",
+        "adult",
+        "athlete",
+        "ball",
+        "basketball",
+        "clothing",
+        "competition",
+        "determination",
+        "exercise"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0027.jpg",
+      "scene_index": 27,
+      "timestamp": 42.667624999999994,
+      "scene_start": 42.5425,
+      "scene_end": 43.626916666666666,
+      "prompt": "Cinematic basketball game scene in packed gymnasium, dramatic side lighting, teal and coral color grade, wide angle shot, intense athletic moment, crowd in retro 70s attire, film grain texture, sports documentary style --ar 16:9",
+      "colors": [
+        "#171817",
+        "#28100f",
+        "#333332",
+        "#405651",
+        "#472e2d"
+      ],
+      "tags": [
+        "adult",
+        "athlete",
+        "ball",
+        "ball game",
+        "basketball",
+        "basketball (ball)",
+        "basketball game",
+        "boy",
+        "child",
+        "competition"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0028.jpg",
+      "scene_index": 28,
+      "timestamp": 43.75204166666666,
+      "scene_start": 43.626916666666666,
+      "scene_end": 44.669624999999996,
+      "prompt": "Professional athlete in white Nike crop top and sunglasses running on track, low angle shot, cinematic sports photography, bright midday sun, teal sky, sharp focus on subject with blurred stadium background, determined athletic mood, Nike commercial style --ar 16:9",
+      "colors": [
+        "#18191a",
+        "#2a3336",
+        "#3b5461",
+        "#492c20",
+        "#4c5455"
+      ],
+      "tags": [
+        "adult",
+        "athlete",
+        "clothing",
+        "competition",
+        "determination",
+        "face",
+        "footrace",
+        "head",
+        "male",
+        "man"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0029.jpg",
+      "scene_index": 29,
+      "timestamp": 44.79474999999999,
+      "scene_start": 44.669624999999996,
+      "scene_end": 45.754041666666666,
+      "prompt": "",
+      "colors": [],
+      "tags": []
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0030.jpg",
+      "scene_index": 30,
+      "timestamp": 45.87916666666666,
+      "scene_start": 45.754041666666666,
+      "scene_end": 46.83845833333333,
+      "prompt": "Dynamic low-angle shot of female athlete mid-jump against bright sun and stadium, athletic wear, teal sky, lens flare, motion blur, cinematic sports photography, inspiring determination, RED camera aesthetic, vibrant contrast --ar 16:9",
+      "colors": [
+        "#383637",
+        "#4b4d50",
+        "#5c8b9a",
+        "#729fac",
+        "#7da5a9"
+      ],
+      "tags": [
+        "adult",
+        "balance beam",
+        "clothing",
+        "competition",
+        "dancing",
+        "female",
+        "footwear",
+        "gymnastic apparatus",
+        "jumping",
+        "long jump"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0031.jpg",
+      "scene_index": 31,
+      "timestamp": 46.963583333333325,
+      "scene_start": 46.83845833333333,
+      "scene_end": 48.08970833333333,
+      "prompt": "Young baseball player running bases in red uniform and helmet, motion blur, bright daylight, saturated teal sky, dynamic low angle shot, nostalgic summer sports film aesthetic, shallow depth of field --ar 16:9",
+      "colors": [
+        "#160e12",
+        "#240b11",
+        "#4f2723",
+        "#641b20",
+        "#6d5a42"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "american football",
+        "athlete",
+        "ball",
+        "ballplayer",
+        "baseball",
+        "baseball bat",
+        "baseball cap",
+        "competition"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0032.jpg",
+      "scene_index": 32,
+      "timestamp": 48.214833333333324,
+      "scene_start": 48.08970833333333,
+      "scene_end": 49.84145833333333,
+      "prompt": "Cinematic basketball action shot from below, player in yellow Lakers 23 jersey shooting against defender, dramatic arena lighting with bokeh lights, muted teal and gold tones, film grain texture, sports commercial aesthetic, intense competitive mood --ar 16:9",
+      "colors": [
+        "#0f1516",
+        "#2b3130",
+        "#53544f",
+        "#745924",
+        "#764e1a"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "athlete",
+        "ball",
+        "ball game",
+        "basket",
+        "basketball",
+        "basketball (ball)",
+        "basketball equipment",
+        "basketball game"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0033.jpg",
+      "scene_index": 33,
+      "timestamp": 49.966583333333325,
+      "scene_start": 49.84145833333333,
+      "scene_end": 51.926874999999995,
+      "prompt": "Baseball player sliding into home plate, golden hour lighting, muted teal sky, cinematic sports photography, ground-level angle, dust cloud, dramatic action shot, nostalgic Americana mood, film grain texture --ar 16:9",
+      "colors": [
+        "#141917",
+        "#20362f",
+        "#2c312c",
+        "#4c6041",
+        "#4f2920"
+      ],
+      "tags": [
+        "action",
+        "adult",
+        "athlete",
+        "ball",
+        "baseball",
+        "baseball (ball)",
+        "baseball bat",
+        "baseball game",
+        "bat-and-ball games",
+        "boy"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0034.jpg",
+      "scene_index": 34,
+      "timestamp": 52.05199999999999,
+      "scene_start": 51.926874999999995,
+      "scene_end": 53.34495833333333,
+      "prompt": "Cinematic baseball catch in mid-action, shallow depth of field, leather glove meeting ball, warm afternoon light, green field bokeh background, sports photography, dynamic motion freeze frame, film grain texture, Nike commercial style --ar 16:9",
+      "colors": [
+        "#383431",
+        "#475e39",
+        "#512b20",
+        "#565852",
+        "#5e5141"
+      ],
+      "tags": [
+        "action",
+        "athlete",
+        "ball",
+        "baseball",
+        "baseball (ball)",
+        "baseball equipment",
+        "baseball glove",
+        "bat-and-ball games",
+        "clothing",
+        "competition"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0035.jpg",
+      "scene_index": 35,
+      "timestamp": 53.47008333333333,
+      "scene_start": 53.34495833333333,
+      "scene_end": 55.72233333333333,
+      "prompt": "Ground-level shot of feet and broom sweeping dusty baseball diamond, warm afternoon sunlight, brown dirt clouds, shallow depth of field, cinematic sports photography, gritty americana aesthetic, motion blur on debris --ar 16:9",
+      "colors": [
+        "#4b3722",
+        "#67543d",
+        "#7c796d",
+        "#807058",
+        "#936f5e"
+      ],
+      "tags": [
+        "action",
+        "athlete",
+        "ballplayer",
+        "baseball",
+        "baseball bat",
+        "baseball game",
+        "beach",
+        "child",
+        "clothing",
+        "competition"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0036.jpg",
+      "scene_index": 36,
+      "timestamp": 55.84745833333333,
+      "scene_start": 55.72233333333333,
+      "scene_end": 57.64091666666666,
+      "prompt": "Pure black void, absolute darkness, no subject, zero light, pitch black emptiness, minimal abstract, void aesthetic, cinematic black screen, deep shadows, film noir style, moody atmospheric --ar 16:9",
+      "colors": [
+        "#000000"
+      ],
+      "tags": [
+        "accessories",
+        "art",
+        "cutlery",
+        "dark",
+        "desktop",
+        "drawing",
+        "firearm",
+        "fork",
+        "formal wear",
+        "gray"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0037.jpg",
+      "scene_index": 37,
+      "timestamp": 57.76604166666666,
+      "scene_start": 57.64091666666666,
+      "scene_end": 58.93387499999999,
+      "prompt": "Bold red typography \"JUST DO IT\" on black background, stark contrast, flat lighting, minimalist sports branding style, Nike-inspired motivational aesthetic, high impact geometric letters, powerful and energetic mood --ar 16:9",
+      "colors": [
+        "#020001",
+        "#560103",
+        "#670207",
+        "#790105",
+        "#980408"
+      ],
+      "tags": [
+        "alphabet",
+        "book",
+        "butcher shop",
+        "design",
+        "desktop",
+        "disjunct",
+        "dynamite",
+        "graphic",
+        "graphic design",
+        "healthcare"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_124406_frame_0038.jpg",
+      "scene_index": 38,
+      "timestamp": 59.05899999999999,
+      "scene_start": 58.93387499999999,
+      "scene_end": 60.059999999999995,
+      "prompt": "Red swoosh logo, soft studio light, vibrant red on pure black, centered graphic, minimalist, clean, abstract corporate branding --ar 16:9",
+      "colors": [
+        "#060101",
+        "#2c0204",
+        "#3f0205",
+        "#780305",
+        "#950408"
+      ],
+      "tags": [
+        "abstract",
+        "art",
+        "astronomy",
+        "batman logo",
+        "crescent",
+        "design",
+        "desktop",
+        "emblem",
+        "illustration",
+        "logo"
+      ]
+    }
+  ],
+  "success": true,
+  "video_info": {
+    "success": true,
+    "video_path": "app/static/processed/videos/video_20251217_124406.mp4",
+    "title": "WHY DO IT? | NIKE",
+    "duration": 60,
+    "thumbnail": "https://i.ytimg.com/vi_webp/Bcpu-jqAL6w/maxresdefault.webp",
+    "uploader": "Nike"
+  },
+  "scene_count": 39,
+  "completed_at": "2025-12-17T12:49:44.252998"
+}

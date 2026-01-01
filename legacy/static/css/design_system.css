@@ -1,0 +1,102 @@
+/* =========================================================================
+   LUMINA DESIGN SYSTEM - VARIABLES & FOUNDATION
+   ========================================================================= */
+
+:root {
+    /* --- COLOR PALETTE --- */
+    /* Backgrounds */
+    --bg-void: #000000;
+    --bg-deep: #050505;
+    --bg-surface: rgba(20, 20, 20, 0.6);
+    --bg-overlay: rgba(0, 0, 0, 0.85);
+
+    /* Text */
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-tertiary: rgba(255, 255, 255, 0.4);
+    --text-disabled: rgba(255, 255, 255, 0.2);
+
+    /* Accents */
+    --accent-blue: #2997FF;
+    --accent-purple: #8B5CF6;
+    --accent-red: #FF3B30;
+    --accent-green: #30D158;
+
+    /* Gradients */
+    --gradient-glow: linear-gradient(135deg, rgba(41, 151, 255, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+    --gradient-text: linear-gradient(135deg, #FFFFFF 0%, rgba(255, 255, 255, 0.8) 100%);
+
+    /* Borders */
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-light: rgba(255, 255, 255, 0.15);
+    --border-focus: rgba(41, 151, 255, 0.5);
+
+    /* --- SHADOWS & GLOWS --- */
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.8);
+
+    --glow-subtle: 0 0 15px rgba(255, 255, 255, 0.05);
+    --glow-active: 0 0 20px rgba(41, 151, 255, 0.3);
+    --glow-text: 0 0 10px rgba(255, 255, 255, 0.6);
+
+    /* --- TYPOGRAPHY --- */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-heading: 'Outfit', var(--font-sans);
+
+    /* --- SPACING & RADIUS --- */
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --radius-pill: 9999px;
+
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+
+    /* --- ANIMATION --- */
+    --ease-squish: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Base Reset */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    background-color: var(--bg-void);
+    background-image: radial-gradient(circle at 50% 0%, #0d0d0d 0%, var(--bg-void) 70%);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    overflow-x: hidden;
+    height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-heading);
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+button {
+    font-family: inherit;
+    user-select: none;
+}

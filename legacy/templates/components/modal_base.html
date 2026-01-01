@@ -1,0 +1,15 @@
+{% macro modal(id, title, class='') %}
+<div id="{{ id }}" class="modal-overlay {{ class }}">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h3>{{ title }}</h3>
+            <button class="btn-icon-soft" onclick="closeModal('{{ id }}')">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-content">
+            {{ caller() }}
+        </div>
+    </div>
+</div>
+{% endmacro %}

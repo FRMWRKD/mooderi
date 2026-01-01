@@ -1,0 +1,524 @@
+{
+  "url": "https://www.youtube.com/watch?v=uNVPiwihYvA",
+  "started_at": "2025-12-17T14:40:08.695905",
+  "stages": {
+    "download": {
+      "message": "Video downloaded",
+      "progress": 25
+    },
+    "scenes": {
+      "message": "Found 18 scenes",
+      "progress": 40
+    },
+    "frames": {
+      "message": "Extracted 18 frames",
+      "progress": 55
+    },
+    "analysis": {
+      "message": "Analysis complete for 18 frames",
+      "progress": 90
+    },
+    "save": {
+      "message": "Saving results...",
+      "progress": 95
+    }
+  },
+  "frames": [
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0000.jpg",
+      "scene_index": 0,
+      "timestamp": 0.12,
+      "scene_start": 0.0,
+      "scene_end": 6.64,
+      "prompt": "Cinematic gym interior, athletes training with weights, golden hour sunlight through large windows, teal and warm tones, wide angle shot, motivational atmosphere, commercial fitness photography style, shallow depth of field, dynamic movement --ar 16:9",
+      "colors": [
+        "#353836",
+        "#545654",
+        "#5a5944",
+        "#6a775a",
+        "#777877"
+      ],
+      "tags": [
+        "adult",
+        "athlete",
+        "barbell",
+        "biceps",
+        "body",
+        "bodybuilding",
+        "brawny",
+        "camera",
+        "concentration",
+        "dumbbell"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0001.jpg",
+      "scene_index": 1,
+      "timestamp": 6.76,
+      "scene_start": 6.64,
+      "scene_end": 7.4,
+      "prompt": "Cinematic close-up of hands adjusting tactical gear, shallow depth of field, muted blue-green tones, natural outdoor lighting, filmic grain, military drama aesthetic, desaturated colors, professional camera work, tense atmospheric mood --ar 16:9",
+      "colors": [
+        "#1a1a1a",
+        "#3a3535",
+        "#3e4d38",
+        "#485c6b",
+        "#543224"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "body part",
+        "car",
+        "driving",
+        "hand",
+        "holding hands",
+        "indoors",
+        "man",
+        "one"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0002.jpg",
+      "scene_index": 2,
+      "timestamp": 7.5200000000000005,
+      "scene_start": 7.4,
+      "scene_end": 9.12,
+      "prompt": "Cinematic close-up of hands typing on laptop keyboard, shallow depth of field, moody low-key lighting, deep burgundy and teal color palette, motion blur on hands, film grain texture, intimate workspace atmosphere, Fincher-style cinematography --ar 16:9",
+      "colors": [
+        "#153645",
+        "#16424f",
+        "#235261",
+        "#395b5d",
+        "#462728"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "body part",
+        "driving",
+        "face",
+        "female",
+        "girl",
+        "hand",
+        "head",
+        "holding hands"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0003.jpg",
+      "scene_index": 3,
+      "timestamp": 9.239999999999998,
+      "scene_start": 9.12,
+      "scene_end": 10.4,
+      "prompt": "Cinematic profile portrait, young person in profile, dramatic side lighting, teal and warm amber color grading, shallow depth of field, film grain, moody atmospheric lighting, contemplative mood, modern cinema photography style --ar 16:9",
+      "colors": [
+        "#0d212d",
+        "#13171a",
+        "#173949",
+        "#184453",
+        "#1f4b5b"
+      ],
+      "tags": [
+        "blur",
+        "body part",
+        "boy",
+        "child",
+        "ear",
+        "face",
+        "head",
+        "indoors",
+        "jaw",
+        "male"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0004.jpg",
+      "scene_index": 4,
+      "timestamp": 10.52,
+      "scene_start": 10.4,
+      "scene_end": 11.64,
+      "prompt": "Motion-blurred gaming controller with RGB lighting, dark cinematic atmosphere, teal and purple neon accents, shallow depth of field, dynamic movement, tech product photography style, moody and energetic --ar 16:9",
+      "colors": [
+        "#0f1315",
+        "#101c2c",
+        "#1d394b",
+        "#243238",
+        "#285160"
+      ],
+      "tags": [
+        "blur",
+        "car",
+        "computer",
+        "detail",
+        "driving",
+        "fast",
+        "horizontal",
+        "motion",
+        "no person",
+        "person"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0005.jpg",
+      "scene_index": 5,
+      "timestamp": 11.76,
+      "scene_start": 11.64,
+      "scene_end": 12.56,
+      "prompt": "Close-up of athletic shoes on wooden floor, cinematic depth of field, muted teal and warm beige tones, shallow focus, moody ambient lighting, film grain texture, urban sport aesthetic, contemplative atmosphere --ar 16:9",
+      "colors": [
+        "#363938",
+        "#625954",
+        "#67564a",
+        "#745b55",
+        "#785c53"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "city",
+        "clothing",
+        "face",
+        "floor",
+        "flooring",
+        "focus",
+        "footwear",
+        "head"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0006.jpg",
+      "scene_index": 6,
+      "timestamp": 12.68,
+      "scene_start": 12.56,
+      "scene_end": 13.52,
+      "prompt": "Cinematic office scene, person in dark suit reviewing documents at desk, moody teal and amber lighting, shallow depth of field, blurred foreground, film noir aesthetic, corporate thriller mood, anamorphic lens flare, desaturated colors --ar 16:9",
+      "colors": [
+        "#10222c",
+        "#131b1d",
+        "#192c37",
+        "#293336",
+        "#3f2f23"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "business",
+        "concert",
+        "driving",
+        "face",
+        "head",
+        "indoors",
+        "light",
+        "man"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0007.jpg",
+      "scene_index": 7,
+      "timestamp": 13.639999999999999,
+      "scene_start": 13.52,
+      "scene_end": 15.36,
+      "prompt": "Motion-blurred soccer player in white jersey with red accents, dynamic action shot, dark moody lighting, cinematic sports photography, shallow depth of field, dramatic atmosphere, professional match intensity --ar 16:9",
+      "colors": [
+        "#0c1217",
+        "#2b3949",
+        "#31393e",
+        "#4f5357",
+        "#505667"
+      ],
+      "tags": [
+        "adult",
+        "animal",
+        "blur",
+        "car",
+        "cat",
+        "competition",
+        "driving",
+        "horizontal",
+        "indoors",
+        "male"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0008.jpg",
+      "scene_index": 8,
+      "timestamp": 15.479999999999999,
+      "scene_start": 15.36,
+      "scene_end": 17.36,
+      "prompt": "young man in profile, intense, strong warm rim lighting, deep black background, shallow depth of field, extremely blurry soft focus, cinematic still, low light photography --ar 16:9",
+      "colors": [
+        "#0e1114",
+        "#312e2a",
+        "#32170e",
+        "#403224",
+        "#4d2d20"
+      ],
+      "tags": [
+        "adult",
+        "black hair",
+        "body part",
+        "cheek",
+        "chin",
+        "eye",
+        "eyebrow",
+        "eyelash",
+        "face",
+        "facial expression"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0009.jpg",
+      "scene_index": 9,
+      "timestamp": 17.48,
+      "scene_start": 17.36,
+      "scene_end": 18.2,
+      "prompt": "Humanoid robot close-up shot, cinematic depth of field, sleek white metallic surface, glowing blue LED eyes, soft dramatic lighting, dark blurred background, modern sci-fi aesthetic, film grain texture, moody atmosphere --ar 16:9",
+      "colors": [
+        "#0e1d2a",
+        "#191d1c",
+        "#293746",
+        "#303432",
+        "#4c5250"
+      ],
+      "tags": [
+        "blur",
+        "car",
+        "driving",
+        "fitness",
+        "gym",
+        "indoors",
+        "no person",
+        "one",
+        "people",
+        "person"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0010.jpg",
+      "scene_index": 10,
+      "timestamp": 18.32,
+      "scene_start": 18.2,
+      "scene_end": 19.76,
+      "prompt": "Close-up portrait, dramatic side lighting creating half-shadow on face, warm golden and teal color grading, cinematic film style, contemplative mood, shallow depth of field, professional studio lighting, moody atmospheric aesthetic --ar 16:9",
+      "colors": [
+        "#121518",
+        "#28363a",
+        "#291411",
+        "#32160e",
+        "#394a4b"
+      ],
+      "tags": [
+        "adult",
+        "black hair",
+        "cheek",
+        "chin",
+        "crying",
+        "ear",
+        "eyebrow",
+        "face",
+        "facial expression",
+        "forehead"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0011.jpg",
+      "scene_index": 11,
+      "timestamp": 19.880000000000003,
+      "scene_start": 19.76,
+      "scene_end": 21.44,
+      "prompt": "Cinematic shallow depth of field, blurred foreground figure, bearded man in green shirt mid-ground, soft natural window light, muted earthy tones, film grain, contemplative intimate mood, indie drama aesthetic --ar 16:9",
+      "colors": [
+        "#4f3333",
+        "#4f5d41",
+        "#52332b",
+        "#56573e",
+        "#6c7656"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "boxing",
+        "child",
+        "face",
+        "female",
+        "head",
+        "love",
+        "male",
+        "man"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0012.jpg",
+      "scene_index": 12,
+      "timestamp": 21.560000000000002,
+      "scene_start": 21.44,
+      "scene_end": 22.92,
+      "prompt": "Close-up of hands playing piano keys, shallow depth of field, muted teal and brown tones, cinematic film grain, soft natural window light, contemplative mood, intimate documentary style, motion blur on hands --ar 16:9",
+      "colors": [
+        "#1f3844",
+        "#323637",
+        "#415a66",
+        "#482f2f",
+        "#51514f"
+      ],
+      "tags": [
+        "adult",
+        "blur",
+        "body part",
+        "car",
+        "driving",
+        "female",
+        "gun",
+        "hand",
+        "head",
+        "holding hands"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0013.jpg",
+      "scene_index": 13,
+      "timestamp": 23.040000000000003,
+      "scene_start": 22.92,
+      "scene_end": 23.84,
+      "prompt": "Casual portrait of bearded man in white athletic jersey with red stripes, soft natural lighting, warm afternoon glow, shallow depth of field, blurred green background, cinematic film aesthetic, authentic candid moment, sports documentary style --ar 16:9",
+      "colors": [
+        "#141a1a",
+        "#184352",
+        "#1b3947",
+        "#1e4e60",
+        "#2d3130"
+      ],
+      "tags": [
+        "adult",
+        "angry",
+        "beard",
+        "blur",
+        "face",
+        "facial hair",
+        "happy",
+        "head",
+        "indoors",
+        "male"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0014.jpg",
+      "scene_index": 14,
+      "timestamp": 23.96,
+      "scene_start": 23.84,
+      "scene_end": 25.16,
+      "prompt": "Cinematic profile portrait, woman in motion blur, golden hour rim lighting on face, deep teal and burgundy tones, shallow depth of field, dramatic side lighting, moody atmospheric, film grain, contemplative mood, arthouse cinematography --ar 16:9",
+      "colors": [
+        "#131a1c",
+        "#2d1514",
+        "#2f2b2b",
+        "#33160e",
+        "#4e251e"
+      ],
+      "tags": [
+        "adult",
+        "angry",
+        "body part",
+        "face",
+        "female",
+        "head",
+        "light",
+        "man",
+        "music",
+        "neck"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0015.jpg",
+      "scene_index": 15,
+      "timestamp": 25.28,
+      "scene_start": 25.16,
+      "scene_end": 27.76,
+      "prompt": "Cinematic portrait of athlete in sports jersey by window, soft natural backlight, muted beige and green tones, shallow depth of field, inspirational mood, motivational commercial style, film grain texture --ar 16:9",
+      "colors": [
+        "#111617",
+        "#2a3d24",
+        "#2f312d",
+        "#4d5b38",
+        "#585652"
+      ],
+      "tags": [
+        "adult",
+        "angry",
+        "contemplation",
+        "face",
+        "happy",
+        "head",
+        "horizontal",
+        "indoors",
+        "male",
+        "man"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0016.jpg",
+      "scene_index": 16,
+      "timestamp": 27.880000000000003,
+      "scene_start": 27.76,
+      "scene_end": 29.24,
+      "prompt": "Cinematic close-up of futuristic robot hands reaching forward, dramatic side lighting, teal and dark tones, shallow depth of field, motivational mood, sci-fi film aesthetic, bokeh background, professional cinematography --ar 16:9",
+      "colors": [
+        "#161815",
+        "#313633",
+        "#375c66",
+        "#395658",
+        "#4e5553"
+      ],
+      "tags": [
+        "equipment",
+        "horizontal",
+        "indoors",
+        "no person",
+        "power",
+        "technology",
+        "transportation",
+        "vehicle",
+        "vertical"
+      ]
+    },
+    {
+      "path": "app/static/processed/frames/video_20251217_144008_frame_0017.jpg",
+      "scene_index": 17,
+      "timestamp": 29.36,
+      "scene_start": 29.24,
+      "scene_end": 30.0,
+      "prompt": "Minimalist white geometric logo on pure black background, three ascending angular bars forming mountain peak, sharp clean lines, high contrast monochrome, studio photography, bold corporate design, adidas style --ar 16:9",
+      "colors": [
+        "#060606",
+        "#323232",
+        "#575757",
+        "#767676",
+        "#9b9b9b"
+      ],
+      "tags": [
+        "art",
+        "cutlery",
+        "design",
+        "desktop",
+        "disjunct",
+        "fork",
+        "green",
+        "illustration",
+        "image",
+        "isolated"
+      ]
+    }
+  ],
+  "success": true,
+  "video_info": {
+    "success": true,
+    "video_path": "app/static/processed/videos/video_20251217_144008.mp4",
+    "title": "How Messi and Mahomes Motivate Each Other to Reach New Heights",
+    "duration": 30,
+    "thumbnail": "https://i.ytimg.com/vi/uNVPiwihYvA/sddefault.jpg",
+    "uploader": "adidas"
+  },
+  "scene_count": 18,
+  "completed_at": "2025-12-17T14:42:42.720610"
+}

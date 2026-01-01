@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% from 'components/card_video.html' import video_card %}
+
+<div class="gallery-header">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h1 style="font-size: 24px;">Search: <span style="color: var(--accent);">{{ filter_label }}</span></h1>
+        {% if query %}
+        <p class="text-secondary" style="font-size: 14px;">{{ images|length }} results for "{{ query }}"</p>
+        {% else %}
+        <p class="text-secondary" style="font-size: 14px;">{{ images|length }} results</p>
+        {% endif %}
+    </div>
+    <a href="{{ url_for('main.index') }}" class="btn btn-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to
+        Library</a>
+</div>
+
+{% if images|length > 0 %}
+<div class="content-padding">
+    <div class="masonry-grid image-focused">
+        {% for image in images %}
+        {{ video_card(image) }}
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="empty-state" style="text-align: center; padding: 80px 20px;">
+    <i class="bi bi-search"
+        style="font-size: 48px; color: var(--text-tertiary); margin-bottom: 16px; display: block;"></i>
+    <h2 style="margin-bottom: 8px;">No results found</h2>
+    <p class="text-secondary">Try a different search term or browse the <a href="/">public library</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

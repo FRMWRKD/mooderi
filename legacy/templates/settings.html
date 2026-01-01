@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="section-header">
+    <div class="section-title">
+        <h1>Settings</h1>
+        <p class="text-secondary">Manage your account and preferences</p>
+    </div>
+</div>
+
+<div class="settings-layout">
+    <!-- Settings Sidebar -->
+    <div class="settings-nav">
+        <a href="#" class="nav-item active"><i class="bi bi-person"></i> Profile</a>
+        <a href="#" class="nav-item"><i class="bi bi-credit-card"></i> Billing & Credits</a>
+        <a href="#" class="nav-item"><i class="bi bi-sliders"></i> Preferences</a>
+        <a href="#" class="nav-item text-danger"><i class="bi bi-box-arrow-right"></i> Log Out</a>
+    </div>
+
+    <!-- Settings Content -->
+    <div class="settings-content">
+
+        <!-- Profile Section -->
+        <div class="card-glass mb-4">
+            <h2 class="card-title">Profile details</h2>
+
+            <div class="form-group">
+                <label>Display Name</label>
+                <input type="text" class="input-glass" value="Theo's Workspace">
+            </div>
+
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" class="input-glass" value="theo@example.com" disabled style="opacity: 0.7;">
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+
+        <!-- Credits Section -->
+        <div class="card-glass">
+            <div class="card-header-row">
+                <h2>Credits Balance</h2>
+                <div class="chip active">
+                    <i class="bi bi-lightning-fill mr-2"></i> 450 Credits
+                </div>
+            </div>
+
+            <div class="pricing-grid">
+                <!-- Starter Pack -->
+                <div class="pricing-card">
+                    <h3>Starter</h3>
+                    <div class="price">$10</div>
+                    <div class="credits-amount">500 Credits</div>
+                    <button class="btn btn-secondary full-width">Buy Now</button>
+                </div>
+
+                <!-- Pro Pack -->
+                <div class="pricing-card popular">
+                    <div class="badge-pop">POPULAR</div>
+                    <h3>Pro</h3>
+                    <div class="price">$25</div>
+                    <div class="credits-amount">1500 Credits</div>
+                    <button class="btn btn-primary full-width">Buy Now</button>
+                </div>
+
+                <!-- Business Pack -->
+                <div class="pricing-card">
+                    <h3>Business</h3>
+                    <div class="price">$100</div>
+                    <div class="credits-amount">8000 Credits</div>
+                    <button class="btn btn-secondary full-width">Buy Now</button>
+                </div>
+            </div>
+
+            <p class="text-center text-secondary small mt-3">
+                Credits are used for generating AI embeddings and video processing.
+            </p>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

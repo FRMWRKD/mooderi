@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Flask-Login
+yt-dlp
+scenedetect[opencv]
+requests
+sentence-transformers
+chromadb
+opencv-python-headless
+
+supabase
+python-dotenv
