@@ -83,6 +83,66 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
+// Filter options cache
+let filterOptionsCache = null;
+let filterOptionsCacheTime = 0;
+const FILTER_OPTIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Get filter options (moods, lighting, tags, etc.)
+app.get('/api/filter-options', async (req, res) => {
+    try {
+        const now = Date.now();
+
+        // Return cached data if valid
+        if (filterOptionsCache && (now - filterOptionsCacheTime) < FILTER_OPTIONS_CACHE_TTL) {
+            return res.json(filterOptionsCache);
+        }
+
+        // Fetch all distinct values in parallel
+        const [moodsResult, lightingResult, tagsResult, countResult] = await Promise.all([
+            supabase.from('images').select('mood').not('mood', 'is', null),
+            supabase.from('images').select('lighting').not('lighting', 'is', null),
+            supabase.from('images').select('tags').not('tags', 'is', null),
+            supabase.from('images').select('id', { count: 'exact', head: true })
+        ]);
+
+        // Extract unique moods
+        const moods = [...new Set(
+            (moodsResult.data || [])
+                .map(r => r.mood)
+                .filter(Boolean)
+        )].sort();
+
+        // Extract unique lighting
+        const lighting = [...new Set(
+            (lightingResult.data || [])
+                .map(r => r.lighting)
+                .filter(Boolean)
+        )].sort();
+
+        // Extract unique tags (flatten arrays)
+        const allTags = (tagsResult.data || [])
+            .flatMap(r => r.tags || [])
+            .filter(Boolean);
+        const tags = [...new Set(allTags)].sort();
+
+        filterOptionsCache = {
+            moods,
+            colors: [],
+            lighting,
+            camera_shots: [],
+            tags,
+            total_images: countResult.count || 0
+        };
+        filterOptionsCacheTime = now;
+
+        return res.json(filterOptionsCache);
+    } catch (e) {
+        console.error("Filter options error:", e);
+        res.status(500).json({ error: e.message, moods: [], colors: [], lighting: [], camera_shots: [], tags: [], total_images: 0 });
+    }
+});
+
 // Smart Board Parse
 app.post('/api/smart-board/parse', async (req, res) => {
     const prompt = (req.body.prompt || '').trim();
