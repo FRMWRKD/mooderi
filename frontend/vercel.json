@@ -1,0 +1,13 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": "nextjs",
+    "buildCommand": "npm run build",
+    "outputDirectory": ".next",
+    "installCommand": "npm install",
+    "env": {
+        "NEXT_PUBLIC_BACKEND_URL": "https://mooderi-u26413.vm.elestio.app"
+    },
+    "regions": [
+        "iad1"
+    ]
+}
