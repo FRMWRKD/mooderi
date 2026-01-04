@@ -161,6 +161,80 @@ app.post('/api/smart-board/generate', async (req, res) => {
     }
 });
 
+// Videos - Get all videos
+app.get('/api/videos', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('videos')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Map to expected format with helper functions
+        const videos = (data || []).map(v => ({
+            id: v.id,
+            title: v.title || extractTitleFromUrl(v.url),
+            thumbnail_url: v.thumbnail_url,
+            url: v.url,
+            frame_count: v.frame_count || 0,
+            duration: v.duration ? formatDuration(v.duration) : null,
+            status: v.status,
+            created_at: v.created_at
+        }));
+
+        return res.json(videos);
+    } catch (e) {
+        console.error("Videos error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Helper: Extract title from URL
+function extractTitleFromUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname.includes('youtube')) {
+            const videoId = urlObj.searchParams.get('v');
+            return videoId ? `YouTube: ${videoId.substring(0, 8)}...` : 'YouTube Video';
+        }
+        if (urlObj.hostname.includes('vimeo')) {
+            const parts = urlObj.pathname.split('/');
+            return `Vimeo: ${parts[parts.length - 1]}`;
+        }
+        return 'Video';
+    } catch {
+        return 'Video';
+    }
+}
+
+// Helper: Format duration
+function formatDuration(seconds) {
+    if (!seconds) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Delete video
+app.delete('/api/videos/:id', async (req, res) => {
+    try {
+        const videoId = req.params.id;
+
+        // Delete associated images first
+        await supabase.from('images').delete().eq('video_id', videoId);
+
+        // Delete video
+        const { error } = await supabase.from('videos').delete().eq('id', videoId);
+        if (error) throw error;
+
+        return res.json({ success: true });
+    } catch (e) {
+        console.error("Delete video error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Video Processing
 app.post('/api/process-video', async (req, res) => {
     const videoUrl = req.body.url;
