@@ -10,7 +10,7 @@ const { startVideoProcessing, getJobStatus, uploadApprovedFramesToDb } = require
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 6030;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -160,209 +160,6 @@ app.post('/api/smart-board/generate', async (req, res) => {
     }
 });
 
-// Videos - Get all videos
-app.get('/api/videos', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('videos')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        // Map to expected format
-        const videos = (data || []).map(v => ({
-            id: v.id,
-            title: v.title || extractTitleFromUrl(v.url),
-            thumbnail_url: v.thumbnail_url,
-            url: v.url,
-            frame_count: v.frame_count || 0,
-            duration: v.duration ? formatDuration(v.duration) : null,
-            status: v.status,
-            created_at: v.created_at
-        }));
-
-        return res.json(videos);
-    } catch (e) {
-        console.error("Videos error:", e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// Helper functions for video titles
-function extractTitleFromUrl(url) {
-    try {
-        const urlObj = new URL(url);
-        if (urlObj.hostname.includes('youtube')) {
-            const videoId = urlObj.searchParams.get('v');
-            return videoId ? `YouTube: ${videoId.substring(0, 8)}...` : 'YouTube Video';
-        }
-        if (urlObj.hostname.includes('vimeo')) {
-            const parts = urlObj.pathname.split('/');
-            return `Vimeo: ${parts[parts.length - 1]}`;
-        }
-        return 'Video';
-    } catch {
-        return 'Video';
-    }
-}
-
-function formatDuration(seconds) {
-    if (!seconds) return null;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Delete video
-app.delete('/api/videos/:id', async (req, res) => {
-    try {
-        const videoId = req.params.id;
-
-        // Delete associated images first
-        await supabase.from('images').delete().eq('video_id', videoId);
-
-        // Delete video
-        const { error } = await supabase.from('videos').delete().eq('id', videoId);
-        if (error) throw error;
-
-        return res.json({ success: true });
-    } catch (e) {
-        console.error("Delete video error:", e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// Filtered images endpoint
-app.get('/api/images/filter', async (req, res) => {
-    try {
-        let query = supabase.from('images').select('*');
-
-        // Apply filters
-        const moods = req.query.mood;
-        if (moods) {
-            const moodArr = Array.isArray(moods) ? moods : [moods];
-            query = query.in('mood', moodArr);
-        }
-
-        const lighting = req.query.lighting;
-        if (lighting) {
-            const lightArr = Array.isArray(lighting) ? lighting : [lighting];
-            query = query.in('lighting', lightArr);
-        }
-
-        const sourceType = req.query.source_type;
-        if (sourceType) {
-            query = query.eq('source_type', sourceType);
-        }
-
-        // Sorting - default to newest
-        const sort = req.query.sort || 'newest';
-        if (sort === 'newest') {
-            query = query.order('created_at', { ascending: false });
-        } else if (sort === 'popular') {
-            query = query.order('likes', { ascending: false });
-        }
-
-        // Pagination
-        const limit = Math.min(parseInt(req.query.limit || 50), 100);
-        const offset = parseInt(req.query.offset || 0);
-        query = query.range(offset, offset + limit - 1);
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        return res.json({
-            images: data || [],
-            count: (data || []).length,
-            has_more: (data || []).length >= limit
-        });
-    } catch (e) {
-        console.error("Filter images error:", e);
-        res.status(500).json({ error: e.message, images: [] });
-    }
-});
-
-// Filter Options - with 5 minute caching
-let filterOptionsCache = null;
-let filterOptionsCacheTime = 0;
-const FILTER_OPTIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-app.get('/api/filter-options', async (req, res) => {
-    try {
-        const now = Date.now();
-
-        // Return cached data if valid
-        if (filterOptionsCache && (now - filterOptionsCacheTime) < FILTER_OPTIONS_CACHE_TTL) {
-            return res.json(filterOptionsCache);
-        }
-
-        // Fetch all distinct values in parallel
-        const [moodsResult, lightingResult, tagsResult, countResult] = await Promise.all([
-            supabase.from('images').select('mood').not('mood', 'is', null),
-            supabase.from('images').select('lighting').not('lighting', 'is', null),
-            supabase.from('images').select('tags').not('tags', 'is', null),
-            supabase.from('images').select('id', { count: 'exact', head: true })
-        ]);
-
-        // Extract unique moods
-        const moods = [...new Set(
-            (moodsResult.data || [])
-                .map(r => r.mood)
-                .filter(Boolean)
-        )].sort();
-
-        // Extract unique lighting
-        const lighting = [...new Set(
-            (lightingResult.data || [])
-                .map(r => r.lighting)
-                .filter(Boolean)
-        )].sort();
-
-        // Extract unique tags (flatten arrays)
-        const allTags = (tagsResult.data || [])
-            .flatMap(r => r.tags || [])
-            .filter(Boolean);
-        const tags = [...new Set(allTags)].sort();
-
-        // Note: colors and camera_shots would be extracted similarly if stored
-        const colors = []; // Placeholder - colors are stored as arrays, need different handling
-        const camera_shots = []; // Placeholder if exists in schema
-
-        filterOptionsCache = {
-            moods,
-            colors,
-            lighting,
-            camera_shots,
-            tags,
-            total_images: countResult.count || 0
-        };
-        filterOptionsCacheTime = now;
-
-        return res.json(filterOptionsCache);
-    } catch (e) {
-        console.error("Filter options error:", e);
-        res.status(500).json({ error: e.message, moods: [], colors: [], lighting: [], camera_shots: [], tags: [], total_images: 0 });
-    }
-});
-
-// Images by video
-app.get('/api/images/by-video/:videoId', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('images')
-            .select('*')
-            .eq('video_id', req.params.videoId)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        return res.json({ images: data || [] });
-    } catch (e) {
-        console.error("Images by video error:", e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
 // Video Processing
 app.post('/api/process-video', async (req, res) => {
     const videoUrl = req.body.url;
@@ -420,37 +217,14 @@ app.get('/api/process-video/frames/:jobId', (req, res) => {
 });
 
 app.post('/api/process-video/approve', async (req, res) => {
-    const { job_id, frame_ids, approved_urls, is_public, folder_id } = req.body;
+    const { job_id, approved_urls, video_url } = req.body;
+    if (!job_id || !approved_urls) return res.status(400).json({ error: 'job_id and approved_urls required' });
 
-    // Accept either frame_ids (from frontend) or approved_urls (legacy)
-    const urlsToApprove = frame_ids || approved_urls;
-
-    if (!job_id || !urlsToApprove) {
-        return res.status(400).json({ error: 'job_id and frame_ids (or approved_urls) required' });
-    }
-
-    // Get video_url from job if not provided
-    const job = getJobStatus(job_id);
-    const videoUrl = req.body.video_url || (job ? job.video_url : null);
-
-    // Pass visibility and folder options
-    const result = await uploadApprovedFramesToDb(job_id, urlsToApprove, videoUrl, {
-        isPublic: is_public !== false, // Default to public/true
-        folderId: folder_id,
-    });
+    const result = await uploadApprovedFramesToDb(job_id, approved_urls, video_url);
     if (result.error) return res.status(500).json(result);
 
-    // Mark job as completed
-    if (job) {
-        job.status = 'completed';
-    }
-
-    return res.json({
-        ...result,
-        approved_count: result.count || urlsToApprove.length
-    });
+    return res.json(result);
 });
-
 
 // Single Image API
 app.get('/api/image/:id', async (req, res) => {
@@ -487,101 +261,6 @@ app.get('/api/image/:id/similar', async (req, res) => {
         return res.json({ images: data || [], has_more: false });
 
     } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-// Generate AI prompts for an image - deducts 1 credit on success
-app.post('/api/image/:id/generate-prompts', async (req, res) => {
-    const imageId = req.params.id;
-
-    try {
-        // Get image
-        const { data: image, error: imageError } = await supabase
-            .from('images')
-            .select('*')
-            .eq('id', imageId)
-            .single();
-
-        if (imageError || !image) {
-            return res.status(404).json({ error: 'Image not found' });
-        }
-
-        // Check if prompts already generated
-        if (image.generated_prompts && Object.keys(image.generated_prompts).length > 0) {
-            return res.json({
-                success: true,
-                prompts: image.generated_prompts,
-                already_generated: true
-            });
-        }
-
-        // Get user from auth header (if available)
-        let userId = null;
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
-            const { data: { user } } = await supabase.auth.getUser(token);
-            userId = user?.id;
-        }
-
-        // Check credits if user is authenticated
-        if (userId) {
-            const { data: profile } = await supabase
-                .from('user_profiles')
-                .select('credits')
-                .eq('id', userId)
-                .single();
-
-            if (profile && profile.credits < 1) {
-                return res.status(402).json({
-                    error: 'Insufficient credits',
-                    credits: 0,
-                    require_upgrade: true
-                });
-            }
-        }
-
-        // Call AI analysis (using Straico or similar)
-        // For now, generate placeholder prompts - in production this would call the AI service
-        const generatedPrompts = {
-            text_to_image: `A ${image.mood || 'cinematic'} scene with ${image.lighting || 'dramatic'} lighting`,
-            image_to_image: `Transform this image with ${image.mood || 'cinematic'} aesthetics`,
-            text_to_video: `Animate this ${image.mood || 'cinematic'} scene with subtle motion`,
-            visionati_analysis: image.prompt || 'Visual analysis pending'
-        };
-
-        // Update image with generated prompts
-        const { error: updateError } = await supabase
-            .from('images')
-            .update({ generated_prompts: generatedPrompts })
-            .eq('id', imageId);
-
-        if (updateError) {
-            throw updateError;
-        }
-
-        // Deduct 1 credit from user on successful generation
-        let remainingCredits = null;
-        if (userId) {
-            const { data: deductResult } = await supabase.rpc('deduct_credits', {
-                p_user_id: userId,
-                p_amount: 1
-            });
-
-            if (deductResult && deductResult.remaining !== undefined) {
-                remainingCredits = deductResult.remaining;
-            }
-        }
-
-        return res.json({
-            success: true,
-            prompts: generatedPrompts,
-            remaining_credits: remainingCredits
-        });
-
-    } catch (e) {
-        console.error("Generate prompts error:", e);
         return res.status(500).json({ error: e.message });
     }
 });

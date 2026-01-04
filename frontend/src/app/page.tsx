@@ -1,13 +1,12 @@
 "use client";
 
 import { AppShell } from "@/components/layout";
-import { ImageCard, FilterBar, type FilterState, NewBoardModal, LandingPage, SortDropdown } from "@/components/features";
+import { ImageCard, FilterBar, type FilterState, NewBoardModal, LandingPage, UploadModal, SmartBoardModal } from "@/components/features";
 import { Button } from "@/components/ui/Button";
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { api, type Image, type Board, type Video } from "@/lib/api";
-import { X, FolderPlus, Trash2, Check, Loader2, Play, Grid, LayoutList } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { api, type Image, type Board } from "@/lib/api";
+import { X, FolderPlus, Trash2, Check, Loader2, Upload, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import Link from "next/link";
 import {
     Dropdown,
     DropdownTrigger,
@@ -53,8 +52,7 @@ export default function HomePage() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [boards, setBoards] = useState<Board[]>([]);
     const [isSavingToBoard, setIsSavingToBoard] = useState(false);
-    const [viewMode, setViewMode] = useState<"grid" | "list" | "videos">("grid");
-    const [showFilters, setShowFilters] = useState(false);
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
     // Fetch dynamic filter options on mount
     useEffect(() => {
@@ -144,15 +142,10 @@ export default function HomePage() {
         }
     }, [isSelectionMode, boards.length]);
 
-    // Debounce filter changes to avoid rapid refetching
     useEffect(() => {
-        if (!user) return;
-
-        const timer = setTimeout(() => {
+        if (user) {
             fetchImages(true);
-        }, 300); // 300ms debounce
-
-        return () => clearTimeout(timer);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSort, activeFilters, searchQuery, searchType, user]);
 
@@ -240,10 +233,6 @@ export default function HomePage() {
     return (
         <AppShell>
             <div className="space-y-6">
-                {/* Page Title */}
-                <h1 className="text-5xl font-black text-center tracking-tight">Discover</h1>
-
-
                 {/* Selection Toolbar */}
                 {isSelectionMode && (
                     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 bg-black border border-white/30">
@@ -323,52 +312,37 @@ export default function HomePage() {
                     </div>
                 )}
 
-                {/* Filter Bar + Sort + View Mode Toggle */}
-                <div className="flex items-center justify-between gap-4 mb-4">
-                    <div className="flex-1">
-                        <FilterBar
-                            onSearch={handleSearch}
-                            onFilterChange={handleFilterChange}
-                            dynamicMoods={dynamicMoods}
-                            dynamicColors={dynamicColors}
-                            dynamicLighting={dynamicLighting}
-                            dynamicCameraShots={dynamicCameraShots}
-                            dynamicTags={dynamicTags}
-                            isLoading={isLoadingFilters}
-                        />
-                    </div>
-
-                    {/* Sort Dropdown */}
-                    <SortDropdown
-                        value={currentSort}
-                        onChange={handleSortChange}
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 mb-4">
+                    <UploadModal
+                        trigger={
+                            <Button variant="secondary" size="sm">
+                                <Upload className="w-4 h-4 mr-2" />
+                                Upload Image
+                            </Button>
+                        }
+                        onImageUploaded={() => fetchImages(true)}
                     />
-
-                    {/* View Mode Toggle */}
-                    <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg flex-shrink-0">
-                        <button
-                            onClick={() => setViewMode("grid")}
-                            className={`p-2 rounded transition-colors ${viewMode === "grid" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}
-                            title="Grid View"
-                        >
-                            <Grid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode("list")}
-                            className={`p-2 rounded transition-colors ${viewMode === "list" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}
-                            title="List View"
-                        >
-                            <LayoutList className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode("videos")}
-                            className={`p-2 rounded flex items-center gap-1.5 transition-colors ${viewMode === "videos" ? "bg-red-600/20 text-red-400" : "text-white/50 hover:text-white/80"}`}
-                            title="Videos View"
-                        >
-                            <Play className="w-4 h-4" />
-                        </button>
-                    </div>
+                    <SmartBoardModal
+                        trigger={
+                            <Button variant="secondary" size="sm">
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Smart Board
+                            </Button>
+                        }
+                    />
                 </div>
+
+                <FilterBar
+                    onSearch={handleSearch}
+                    onFilterChange={handleFilterChange}
+                    dynamicMoods={dynamicMoods}
+                    dynamicColors={dynamicColors}
+                    dynamicLighting={dynamicLighting}
+                    dynamicCameraShots={dynamicCameraShots}
+                    dynamicTags={dynamicTags}
+                    isLoading={isLoadingFilters}
+                />
 
                 {/* Error State */}
                 {error && (
@@ -395,47 +369,30 @@ export default function HomePage() {
                     </div>
                 )}
 
-                {/* Image Grid / List / Videos */}
-                {images.length > 0 && viewMode !== "videos" && (
+                {/* Image Grid / List */}
+                {images.length > 0 && (
                     <div className={
                         viewMode === "grid"
                             ? "columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-5"
                             : "flex flex-col gap-4"
                     }>
                         {images.map((image) => (
-                            <Link key={image.id} href={`/image/${image.id}`} className={viewMode === "list" ? "flex gap-5 p-4 bg-white/5 rounded-xl border border-border-subtle hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer" : ""}>
+                            <div key={image.id} className={viewMode === "list" ? "flex gap-4 p-3 bg-white/5 rounded-xl border border-border-subtle hover:border-white/20 transition-all" : ""}>
                                 {viewMode === "list" && (
                                     <img
                                         src={image.image_url}
                                         alt={image.prompt || ""}
-                                        className="w-28 h-28 object-cover rounded-lg flex-shrink-0"
+                                        className="w-24 h-24 object-cover rounded-lg flex-shrink-0"
                                     />
                                 )}
                                 {viewMode === "list" ? (
-                                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                                        <div>
-                                            <p className="text-base text-text-primary font-medium line-clamp-2 mb-2">{image.prompt || "Untitled"}</p>
-                                            <div className="flex items-center gap-3 flex-wrap">
-                                                {image.mood && (
-                                                    <span className="text-xs bg-white/10 px-2 py-1 rounded">{image.mood}</span>
-                                                )}
-                                                {image.lighting && (
-                                                    <span className="text-xs text-text-tertiary">{image.lighting}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between mt-3">
-                                            <div className="flex gap-1">
-                                                {image.colors?.slice(0, 5).map((color, i) => (
-                                                    <span key={i} className="w-5 h-5 rounded border border-white/20" style={{ backgroundColor: color }} />
-                                                ))}
-                                            </div>
-                                            {image.source_video_url && (
-                                                <span className="text-[10px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded flex items-center gap-1">
-                                                    <Play className="w-3 h-3" />
-                                                    Video Frame
-                                                </span>
-                                            )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-text-primary font-medium truncate">{image.prompt || "Untitled"}</p>
+                                        <p className="text-xs text-text-tertiary mt-1">{image.mood || "No mood"}</p>
+                                        <div className="flex gap-2 mt-2">
+                                            {image.colors?.slice(0, 3).map((color, i) => (
+                                                <span key={i} className="w-4 h-4 border border-white/20" style={{ backgroundColor: color }} />
+                                            ))}
                                         </div>
                                     </div>
                                 ) : (
@@ -450,112 +407,10 @@ export default function HomePage() {
                                         onSelect={() => toggleSelection(image.id)}
                                     />
                                 )}
-                            </Link>
+                            </div>
                         ))}
                     </div>
                 )}
-
-                {/* Videos View - Group by video_id */}
-                {images.length > 0 && viewMode === "videos" && (() => {
-                    // Group images by video
-                    const videoGroups = images.reduce((acc, img) => {
-                        if (img.video_id) {
-                            if (!acc[img.video_id]) {
-                                acc[img.video_id] = {
-                                    videoId: img.video_id,
-                                    sourceUrl: img.source_video_url || "",
-                                    images: []
-                                };
-                            }
-                            acc[img.video_id].images.push(img);
-                        }
-                        return acc;
-                    }, {} as Record<string, { videoId: string; sourceUrl: string; images: Image[] }>);
-
-                    const videoEntries = Object.values(videoGroups).sort((a, b) => b.images.length - a.images.length);
-
-                    if (videoEntries.length === 0) {
-                        return (
-                            <div className="text-center py-12">
-                                <Play className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                                <p className="text-text-secondary">No video frames found matching your search.</p>
-                                <p className="text-text-tertiary text-sm mt-1">Try switching to Grid view to see all images.</p>
-                            </div>
-                        );
-                    }
-
-                    return (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {videoEntries.map((group) => {
-                                const youtubeMatch = group.sourceUrl?.match(/(?:v=|\/embed\/|youtu\.be\/)([^&?/]+)/);
-                                const youtubeId = youtubeMatch ? youtubeMatch[1] : null;
-                                const thumbnailUrl = youtubeId
-                                    ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`
-                                    : group.images[0]?.image_url;
-
-                                return (
-                                    <Link
-                                        key={group.videoId}
-                                        href={`/video/${group.videoId}`}
-                                        className="group relative bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-white/20 transition-all"
-                                    >
-                                        {/* Video Thumbnail / Preview */}
-                                        <div className="relative aspect-video">
-                                            <img
-                                                src={thumbnailUrl}
-                                                alt="Video thumbnail"
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-
-                                            {/* Play Button Overlay */}
-                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <div className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-lg">
-                                                    <Play className="w-6 h-6 text-white fill-current ml-1" />
-                                                </div>
-                                            </div>
-
-                                            {/* Frame count badge */}
-                                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                                                <span className="bg-black/70 px-2 py-1 rounded text-xs font-medium">
-                                                    {group.images.length} frames
-                                                </span>
-                                            </div>
-
-                                            {/* Frame previews on hover */}
-                                            <div className="absolute bottom-3 right-3 flex -space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {group.images.slice(0, 4).map((img, i) => (
-                                                    <img
-                                                        key={img.id}
-                                                        src={img.image_url}
-                                                        alt=""
-                                                        className="w-10 h-10 rounded border-2 border-black object-cover"
-                                                        style={{ zIndex: 4 - i }}
-                                                    />
-                                                ))}
-                                                {group.images.length > 4 && (
-                                                    <div className="w-10 h-10 rounded border-2 border-black bg-black/80 flex items-center justify-center text-xs font-medium">
-                                                        +{group.images.length - 4}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Video Info */}
-                                        <div className="p-3">
-                                            <p className="text-sm font-medium truncate group-hover:text-white transition-colors">
-                                                {youtubeId ? "YouTube Video" : "Video"}
-                                            </p>
-                                            <p className="text-xs text-text-tertiary mt-1">
-                                                {group.images.length} extracted frames
-                                            </p>
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    );
-                })()}
 
                 {/* Empty State */}
                 {!isLoading && !error && images.length === 0 && (
