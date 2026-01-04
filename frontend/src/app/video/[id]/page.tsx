@@ -4,116 +4,69 @@ import { AppShell } from "@/components/layout";
 import { ImageCard } from "@/components/features/ImageCard";
 import { Button } from "@/components/ui/Button";
 import { api, type Image, type Video } from "@/lib/api";
-import {
-    ArrowLeft,
-    Play,
-    Clock,
-    Images,
-    Calendar,
-    Activity,
-    RotateCw,
-    Trash2,
-    Grid,
-    ExternalLink,
-} from "lucide-react";
+import { ArrowLeft, Play, ExternalLink, Trash2, Images, Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
-export default function VideoDetailPage({
-    params,
-}: {
-    params: { id: string };
-}) {
+export default function VideoDetailPage() {
+    const params = useParams();
+    const router = useRouter();
+    const videoId = params.id as string;
+
     const [video, setVideo] = useState<Video | null>(null);
-    const [frames, setFrames] = useState<Image[]>([]);
+    const [images, setImages] = useState<Image[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const router = useRouter();
-
-    const videoId = params.id;
 
     useEffect(() => {
-        async function loadData() {
-            setIsLoading(true);
-
-            // Get video list and find the one we need
-            const videosResult = await api.getVideos();
-            let videoList = videosResult.data || [];
-
-            const found = videoList.find((v) => v.id === videoId);
-            if (found) {
-                setVideo(found);
-            } else {
-                setError("Video not found");
-                setIsLoading(false);
-                return;
-            }
-
-            // Get frames from this video
-            const framesResult = await api.getImagesByVideo(videoId);
-            if (framesResult.data) {
-                setFrames(framesResult.data.images || []);
-            }
-
-            setIsLoading(false);
+        if (videoId) {
+            loadVideoAndImages();
         }
-
-        loadData();
     }, [videoId]);
 
-    const handleDelete = async () => {
-        if (!confirm("Are you sure? This will delete the video and all extracted frames.")) {
-            return;
+    const loadVideoAndImages = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            // Load video details
+            const videosResult = await api.getVideos();
+            const foundVideo = videosResult.data?.find(v => v.id === videoId);
+
+            if (foundVideo) {
+                setVideo(foundVideo);
+            }
+
+            // Load images for this video
+            const imagesResult = await api.getImagesByVideo(videoId);
+            if (imagesResult.data) {
+                setImages(imagesResult.data.images || []);
+            }
+        } catch (e) {
+            setError("Failed to load video details");
         }
 
-        setIsDeleting(true);
+        setIsLoading(false);
+    };
+
+    const handleDeleteVideo = async () => {
+        if (!confirm("Are you sure you want to delete this video and all its frames?")) {
+            return;
+        }
         const result = await api.deleteVideo(videoId);
         if (result.data?.success) {
             router.push("/videos");
         } else {
             alert(result.error || "Failed to delete video");
-            setIsDeleting(false);
         }
-    };
-
-    const formatDuration = (duration?: string | number) => {
-        if (!duration) return "0m 0s";
-        const seconds = typeof duration === "string" ? parseInt(duration, 10) : duration;
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${minutes}m ${secs}s`;
     };
 
     if (isLoading) {
         return (
             <AppShell>
-                <div className="p-10">
-                    <div className="h-8 w-32 bg-white/5 rounded animate-pulse mb-6" />
-                    <div className="flex gap-8">
-                        <div className="w-80 aspect-video bg-white/5 rounded-xl animate-pulse" />
-                        <div className="flex-1 space-y-4">
-                            <div className="h-8 w-64 bg-white/5 rounded animate-pulse" />
-                            <div className="h-4 w-48 bg-white/5 rounded animate-pulse" />
-                        </div>
-                    </div>
-                </div>
-            </AppShell>
-        );
-    }
-
-    if (error || !video) {
-        return (
-            <AppShell>
-                <div className="text-center py-20">
-                    <h2 className="text-xl font-semibold mb-2">Video not found</h2>
-                    <p className="text-text-secondary mb-6">
-                        {error || "This video doesn't exist or has been removed."}
-                    </p>
-                    <Button variant="accent" asChild>
-                        <Link href="/videos">Back to Videos</Link>
-                    </Button>
+                <div className="flex items-center justify-center h-64">
+                    <Loader2 className="w-8 h-8 animate-spin text-accent-blue" />
                 </div>
             </AppShell>
         );
@@ -121,122 +74,117 @@ export default function VideoDetailPage({
 
     return (
         <AppShell>
-            {/* Header */}
-            <div className="p-10 bg-black/30 border-b border-border-subtle">
-                <div className="max-w-[1200px] mx-auto">
-                    <div className="flex items-start gap-8">
+            <div className="space-y-8">
+                {/* Back Link */}
+                <Link
+                    href="/videos"
+                    className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Videos
+                </Link>
+
+                {/* Video Header */}
+                {video && (
+                    <div className="flex flex-col md:flex-row gap-6">
                         {/* Thumbnail */}
-                        <div className="w-80 flex-shrink-0">
-                            <div className="relative aspect-video rounded-xl overflow-hidden group">
-                                <img
-                                    src={video.thumbnail_url || "https://via.placeholder.com/640x360?text=No+Thumbnail"}
-                                    alt={video.title}
-                                    className="w-full h-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <a
-                                        href={video.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-16 h-16 rounded-full bg-accent-purple flex items-center justify-center"
-                                    >
-                                        <Play className="w-6 h-6 ml-1" />
-                                    </a>
-                                </div>
+                        <div className="relative aspect-video w-full md:w-96 rounded-xl overflow-hidden bg-white/5 flex-shrink-0">
+                            <img
+                                src={video.thumbnail_url || "https://via.placeholder.com/400x225?text=Video"}
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <button
+                                    onClick={() => window.open(video.url, "_blank")}
+                                    className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
+                                >
+                                    <Play className="w-8 h-8 text-white fill-white" />
+                                </button>
                             </div>
+                            {video.duration && (
+                                <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 rounded text-xs font-medium">
+                                    {video.duration}
+                                </span>
+                            )}
                         </div>
 
-                        {/* Info */}
+                        {/* Video Info */}
                         <div className="flex-1">
-                            <Link
-                                href="/videos"
-                                className="inline-flex items-center gap-2 text-text-tertiary text-sm hover:text-text-secondary mb-3"
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                Back to My Videos
-                            </Link>
-                            <h1 className="text-2xl font-bold mb-2">{video.title || "Untitled Video"}</h1>
-                            <div className="flex gap-4 text-sm text-text-secondary mb-6">
-                                <span className="flex items-center gap-1">
-                                    <Clock className="w-4 h-4" />
-                                    {formatDuration(video.duration)}
-                                </span>
-                                <span className="flex items-center gap-1">
+                            <h1 className="text-2xl font-bold mb-3">{video.title}</h1>
+
+                            <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary mb-6">
+                                <span className="flex items-center gap-1.5">
                                     <Images className="w-4 h-4" />
-                                    {video.frame_count} frames
+                                    {images.length} frames extracted
                                 </span>
-                                <span className="flex items-center gap-1">
-                                    <Calendar className="w-4 h-4" />
+                                <span className="flex items-center gap-1.5">
+                                    <Clock className="w-4 h-4" />
                                     {video.created_at?.substring(0, 10)}
                                 </span>
-                                <span className="flex items-center gap-1 capitalize">
-                                    <Activity className="w-4 h-4" />
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${video.status === "completed"
+                                        ? "bg-green-500/20 text-green-400"
+                                        : "bg-yellow-500/20 text-yellow-400"
+                                    }`}>
                                     {video.status}
                                 </span>
                             </div>
 
                             <div className="flex gap-3">
-                                <Button variant="accent" disabled>
-                                    <RotateCw className="w-4 h-4 mr-1" />
-                                    Reprocess
-                                </Button>
                                 <Button
                                     variant="secondary"
-                                    className="text-red-400 hover:text-red-300"
-                                    onClick={handleDelete}
-                                    disabled={isDeleting}
+                                    onClick={() => window.open(video.url, "_blank")}
                                 >
-                                    <Trash2 className="w-4 h-4 mr-1" />
-                                    {isDeleting ? "Deleting..." : "Delete Video"}
+                                    <ExternalLink className="w-4 h-4" />
+                                    Open Source
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    className="text-red-400 hover:bg-red-500/10"
+                                    onClick={handleDeleteVideo}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete Video
                                 </Button>
                             </div>
-
-                            <p className="mt-6 text-sm text-text-secondary">
-                                Source URL:{" "}
-                                <a
-                                    href={video.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-accent-blue hover:underline inline-flex items-center gap-1"
-                                >
-                                    {video.url}
-                                    <ExternalLink className="w-3 h-3" />
-                                </a>
-                            </p>
                         </div>
                     </div>
-                </div>
-            </div>
+                )}
 
-            {/* Frames */}
-            <div className="p-10 max-w-[1400px] mx-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-semibold">Extracted Frames</h3>
-                    <Button variant="secondary" size="sm" asChild>
-                        <Link href={`/?video_id=${video.id}`}>
-                            <Grid className="w-4 h-4 mr-1" />
-                            View in Gallery
-                        </Link>
-                    </Button>
-                </div>
-
-                {frames.length > 0 ? (
-                    <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4">
-                        {frames.map((image) => (
-                            <ImageCard
-                                key={image.id}
-                                id={image.id}
-                                imageUrl={image.image_url}
-                                mood={image.mood}
-                                colors={image.colors}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-12 text-text-secondary">
-                        <p>No frames extracted yet. The video might still be processing.</p>
+                {/* Error State */}
+                {error && (
+                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400">
+                        {error}
                     </div>
                 )}
+
+                {/* Frames Section */}
+                <div>
+                    <h2 className="text-xl font-semibold mb-4">
+                        Extracted Frames
+                        <span className="text-text-tertiary font-normal ml-2">({images.length})</span>
+                    </h2>
+
+                    {images.length === 0 ? (
+                        <div className="text-center py-16 bg-white/5 rounded-xl">
+                            <Images className="w-12 h-12 mx-auto mb-3 text-text-tertiary opacity-50" />
+                            <p className="text-text-secondary">No frames extracted yet</p>
+                        </div>
+                    ) : (
+                        <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-5">
+                            {images.map((image) => (
+                                <ImageCard
+                                    key={image.id}
+                                    id={image.id}
+                                    imageUrl={image.image_url}
+                                    mood={image.mood}
+                                    colors={image.colors}
+                                    tags={image.tags}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </AppShell>
     );

@@ -2,17 +2,6 @@
 
 import { AppShell } from "@/components/layout";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import {
-    Modal,
-    ModalTrigger,
-    ModalContent,
-    ModalHeader,
-    ModalTitle,
-    ModalBody,
-    ModalFooter,
-    ModalCloseButton,
-} from "@/components/ui/Modal";
 import {
     Play,
     Clock,
@@ -21,11 +10,13 @@ import {
     ExternalLink,
     Trash2,
     Eye,
+    Loader2,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Video } from "@/lib/api";
+import { useVideoJobs } from "@/contexts/VideoJobContext";
 import {
     Dropdown,
     DropdownTrigger,
@@ -37,54 +28,45 @@ import {
 export default function VideosPage() {
     const [videos, setVideos] = useState<Video[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [videoUrl, setVideoUrl] = useState("");
-    const [quality, setQuality] = useState<"strict" | "medium" | "high">("medium");
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const router = useRouter();
+    const { jobs } = useVideoJobs();
 
-    useEffect(() => {
-        loadVideos();
-    }, []);
-
-    const loadVideos = async () => {
-        setIsLoading(true);
+    const loadVideos = useCallback(async (showFullLoader = true) => {
+        if (showFullLoader) {
+            setIsLoading(true);
+        } else {
+            setIsRefreshing(true);
+        }
         const result = await api.getVideos();
         if (result.data && result.data.length > 0) {
             setVideos(result.data);
         } else {
-            // No videos found - show empty state
             setVideos([]);
         }
         setIsLoading(false);
-    };
+        setIsRefreshing(false);
+    }, []);
 
-    const handleStartAnalysis = async () => {
-        if (!videoUrl.trim()) {
-            setError("Please enter a valid video URL");
-            return;
+    // Initial load
+    useEffect(() => {
+        loadVideos();
+    }, [loadVideos]);
+
+    // Auto-refresh when window gains focus
+    useEffect(() => {
+        const handleFocus = () => loadVideos(false);
+        window.addEventListener("focus", handleFocus);
+        return () => window.removeEventListener("focus", handleFocus);
+    }, [loadVideos]);
+
+    // Refresh when any job becomes completed
+    useEffect(() => {
+        const completedJobs = jobs.filter(j => j.status === "completed" || j.status === "pending_approval");
+        if (completedJobs.length > 0) {
+            loadVideos(false);
         }
-
-        setError(null);
-        setIsAnalyzing(true);
-
-        try {
-            const result = await api.analyzeVideo(videoUrl, quality);
-            if (result.data?.job_id) {
-                setIsModalOpen(false);
-                setVideoUrl("");
-                // Refresh the video list
-                loadVideos();
-            } else {
-                setError(result.error || "Failed to start analysis");
-            }
-        } catch (e) {
-            setError("An unexpected error occurred");
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
+    }, [jobs, loadVideos]);
 
     const handleDeleteVideo = async (videoId: string) => {
         if (!confirm("Are you sure you want to delete this video and all its frames?")) {
@@ -92,16 +74,10 @@ export default function VideosPage() {
         }
         const result = await api.deleteVideo(videoId);
         if (result.data?.success) {
-            loadVideos();
+            loadVideos(false);
         } else {
             alert(result.error || "Failed to delete video");
         }
-    };
-
-    const handleCancel = () => {
-        setIsModalOpen(false);
-        setVideoUrl("");
-        setError(null);
     };
 
     const displayVideos = videos;
@@ -109,75 +85,14 @@ export default function VideosPage() {
     return (
         <AppShell>
             <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex justify-between items-center">
                     <div>
                         <h1 className="text-3xl font-bold mb-1">My Videos</h1>
                         <p className="text-sm text-text-secondary">
                             {displayVideos.length} source videos processed
+                            {isRefreshing && <Loader2 className="inline w-3 h-3 ml-2 animate-spin" />}
                         </p>
                     </div>
-                    <Modal open={isModalOpen} onOpenChange={setIsModalOpen}>
-                        <ModalTrigger asChild>
-                            <Button variant="accent" onClick={() => setIsModalOpen(true)}>
-                                <Play className="w-4 h-4" />
-                                New Video
-                            </Button>
-                        </ModalTrigger>
-                        <ModalContent className="max-w-md">
-                            <ModalHeader>
-                                <ModalTitle>Analyze Video</ModalTitle>
-                                <ModalCloseButton />
-                            </ModalHeader>
-                            <ModalBody className="space-y-6">
-                                <div>
-                                    <label className="text-sm text-text-secondary mb-2 block">
-                                        YouTube or Vimeo URL
-                                    </label>
-                                    <Input
-                                        placeholder="https://youtube.com/watch?v=..."
-                                        value={videoUrl}
-                                        onChange={(e) => setVideoUrl(e.target.value)}
-                                    />
-                                    {error && (
-                                        <p className="text-sm text-red-400 mt-2">{error}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="text-sm text-text-secondary mb-3 block">
-                                        Frame Selection Quality
-                                    </label>
-                                    <div className="space-y-2">
-                                        {(["strict", "medium", "high"] as const).map((q) => (
-                                            <label
-                                                key={q}
-                                                className={`flex items-center gap-4 p-3 rounded-lg border cursor-pointer transition-all ${quality === q
-                                                    ? "border-accent-blue bg-accent-blue/5"
-                                                    : "border-border-subtle hover:border-border-light"
-                                                    }`}
-                                                onClick={() => setQuality(q)}
-                                            >
-                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${quality === q ? "border-accent-blue" : "border-text-tertiary"
-                                                    }`}>
-                                                    {quality === q && <div className="w-2.5 h-2.5 rounded-full bg-accent-blue" />}
-                                                </div>
-                                                <span className="font-medium capitalize">{q}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </ModalBody>
-                            <ModalFooter>
-                                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-                                <Button
-                                    variant="default"
-                                    onClick={handleStartAnalysis}
-                                    disabled={isAnalyzing || !videoUrl.trim()}
-                                >
-                                    {isAnalyzing ? "Analyzing..." : "▶ Start Analysis"}
-                                </Button>
-                            </ModalFooter>
-                        </ModalContent>
-                    </Modal>
                 </div>
 
                 {/* Video Grid */}
@@ -204,12 +119,8 @@ export default function VideosPage() {
                         </div>
                         <h2 className="text-xl font-semibold mb-2">No videos yet</h2>
                         <p className="text-text-secondary mb-6">
-                            Analyze your first video to extract cinematic frames
+                            Use the <strong>Add</strong> button above to analyze your first video
                         </p>
-                        <Button variant="accent" onClick={() => setIsModalOpen(true)}>
-                            <Play className="w-4 h-4" />
-                            Analyze Video
-                        </Button>
                     </div>
                 )}
             </div>
@@ -226,13 +137,39 @@ function VideoCard({
 }) {
     const isProcessing = video.status === "processing";
 
+    // Extract YouTube ID from URL for auto-generating thumbnail
+    const getYouTubeId = (url: string) => {
+        const patterns = [
+            /(?:v=|\/v\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+            /(?:embed\/)([a-zA-Z0-9_-]{11})/,
+            /(?:shorts\/)([a-zA-Z0-9_-]{11})/
+        ];
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) return match[1];
+        }
+        return null;
+    };
+
+    const youtubeId = getYouTubeId(video.url);
+
+    // Generate thumbnail URL - prefer stored, fallback to YouTube API
+    const thumbnailUrl = video.thumbnail_url
+        || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : null)
+        || "https://via.placeholder.com/400x225?text=Video";
+
+    // Generate display title - prefer stored, fallback to platform name
+    const displayTitle = video.title
+        || (youtubeId ? "YouTube Video" : "Video")
+        || video.id.substring(0, 8);
+
     return (
         <div className="group relative bg-background-glass border border-border-subtle rounded-xl overflow-hidden transition-all hover:border-border-light hover:shadow-glass">
             {/* Thumbnail */}
             <div className="relative aspect-video">
                 <img
-                    src={video.thumbnail_url || "https://via.placeholder.com/400x225?text=Video"}
-                    alt={video.title}
+                    src={thumbnailUrl}
+                    alt={displayTitle}
                     className="w-full h-full object-cover"
                 />
 
@@ -247,9 +184,19 @@ function VideoCard({
                 )}
 
                 {/* Duration Badge */}
-                <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 rounded text-xs font-medium">
-                    {video.duration}
-                </span>
+                {video.duration && (
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 rounded text-xs font-medium">
+                        {video.duration}
+                    </span>
+                )}
+
+                {/* YouTube Badge */}
+                {youtubeId && (
+                    <span className="absolute top-2 left-2 px-2 py-0.5 bg-red-600 rounded text-xs font-medium flex items-center gap-1">
+                        <Play className="w-3 h-3 fill-current" />
+                        YouTube
+                    </span>
+                )}
 
                 {/* Hover Overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -266,7 +213,7 @@ function VideoCard({
             <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-medium truncate mb-1">{video.title}</h3>
+                        <h3 className="font-medium truncate mb-1">{displayTitle}</h3>
                         <div className="flex items-center gap-3 text-xs text-text-secondary">
                             <span className="flex items-center gap-1">
                                 <Images className="w-3.5 h-3.5" />
@@ -309,4 +256,3 @@ function VideoCard({
         </div>
     );
 }
-

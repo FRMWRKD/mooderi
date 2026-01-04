@@ -9,6 +9,55 @@ const jobs = {};
 
 const MODAL_VIDEO_ENDPOINT = process.env.MODAL_VIDEO_ENDPOINT || "https://frmwrkd-media--moodboard-video-processor-process-video-api.modal.run";
 
+// Extract YouTube video ID from URL
+const extractYouTubeId = (url) => {
+    const patterns = [
+        /(?:v=|\/v\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+        /(?:embed\/)([a-zA-Z0-9_-]{11})/,
+        /(?:shorts\/)([a-zA-Z0-9_-]{11})/
+    ];
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) return match[1];
+    }
+    return null;
+};
+
+// Get YouTube video info (title, thumbnail) using oEmbed API
+const getYouTubeInfo = async (videoUrl) => {
+    const videoId = extractYouTubeId(videoUrl);
+    if (!videoId) return null;
+
+    try {
+        // Use YouTube oEmbed API (no API key needed)
+        const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+        const response = await axios.get(oembedUrl, { timeout: 5000 });
+
+        return {
+            title: response.data.title || 'YouTube Video',
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            videoId: videoId
+        };
+    } catch (e) {
+        console.error('Error fetching YouTube info:', e.message);
+        // Fallback to just ID-based thumbnail
+        return {
+            title: 'YouTube Video',
+            thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+            videoId: videoId
+        };
+    }
+};
+
+// Extract platform from URL
+const getVideoPlatform = (url) => {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+    if (url.includes('instagram.com')) return 'instagram';
+    if (url.includes('tiktok.com')) return 'tiktok';
+    if (url.includes('vimeo.com')) return 'vimeo';
+    return 'other';
+};
+
 // Background processing function (fire and forget)
 const processWithModal = async (jobId, videoUrl, qualityMode) => {
     try {
@@ -53,11 +102,29 @@ const startVideoProcessing = (videoUrl, qualityMode = 'medium', userId = null) =
     const jobId = uuidv4();
     let videoId = null;
 
-    // Create video record
+    // Create video record with extracted info
     (async () => {
         try {
+            // Get video info (title, thumbnail) for YouTube
+            let title = null;
+            let thumbnailUrl = null;
+            const platform = getVideoPlatform(videoUrl);
+
+            if (platform === 'youtube') {
+                const info = await getYouTubeInfo(videoUrl);
+                if (info) {
+                    title = info.title;
+                    thumbnailUrl = info.thumbnailUrl;
+                }
+            } else {
+                // For other platforms, use URL as fallback title
+                title = platform.charAt(0).toUpperCase() + platform.slice(1) + ' Video';
+            }
+
             const { data } = await supabaseAdmin.from('videos').insert({
                 url: videoUrl,
+                title: title,
+                thumbnail_url: thumbnailUrl,
                 quality_mode: qualityMode,
                 status: 'processing',
                 is_public: true,
@@ -66,7 +133,11 @@ const startVideoProcessing = (videoUrl, qualityMode = 'medium', userId = null) =
 
             if (data) {
                 videoId = data.id;
-                if (jobs[jobId]) jobs[jobId].video_id = videoId;
+                if (jobs[jobId]) {
+                    jobs[jobId].video_id = videoId;
+                    jobs[jobId].title = title;
+                    jobs[jobId].thumbnail_url = thumbnailUrl;
+                }
             }
         } catch (e) {
             console.error("Error creating video record:", e);
@@ -93,37 +164,77 @@ const startVideoProcessing = (videoUrl, qualityMode = 'medium', userId = null) =
 
 const getJobStatus = (jobId) => jobs[jobId];
 
-const uploadApprovedFramesToDb = async (jobId, approvedUrls, videoUrl) => {
+const uploadApprovedFramesToDb = async (jobId, approvedUrls, videoUrl, options = {}) => {
     try {
         const job = jobs[jobId] || {};
         const videoId = job.video_id;
         const userId = job.user_id;
+        const isPublic = options.isPublic !== false; // Default to true
+        const folderId = options.folderId || null;
 
         const dbRows = approvedUrls.map(url => ({
             image_url: url,
             prompt: "",
             source_video_url: videoUrl,
-            is_public: true,
+            is_public: isPublic,
             mood: "Cinematic",
             lighting: "Cinematic",
             tags: [],
             colors: [],
             source_type: "video_import",
             video_id: videoId,
-            user_id: userId
+            user_id: userId,
+            board_id: folderId, // Save to folder if specified
         }));
 
         if (dbRows.length > 0) {
             const { data, error } = await supabaseAdmin.from('images').insert(dbRows).select();
             if (error) throw error;
 
+            // Update video record
             if (videoId) {
                 await supabaseAdmin.from('videos').update({
                     frame_count: data.length,
                     status: 'completed'
                 }).eq('id', videoId);
             }
-            return { success: true, count: data.length, video_id: videoId };
+
+            // If public, track contribution for credit rewards
+            // For every 10 public images, user earns 1 free credit
+            if (isPublic && userId && data.length > 0) {
+                // Get current contribution count
+                const { data: profile } = await supabaseAdmin
+                    .from('user_profiles')
+                    .select('public_contributions')
+                    .eq('user_id', userId)
+                    .single();
+
+                const currentContributions = profile?.public_contributions || 0;
+                const newContributions = currentContributions + data.length;
+                const creditsEarned = Math.floor(newContributions / 10) - Math.floor(currentContributions / 10);
+
+                // Update profile with new contribution count and add credits if earned
+                if (creditsEarned > 0) {
+                    await supabaseAdmin.rpc('add_credits', {
+                        p_user_id: userId,
+                        p_amount: creditsEarned
+                    });
+                }
+
+                // Update contribution count
+                await supabaseAdmin
+                    .from('user_profiles')
+                    .update({ public_contributions: newContributions })
+                    .eq('user_id', userId);
+            }
+
+            return {
+                success: true,
+                count: data.length,
+                video_id: videoId,
+                is_public: isPublic,
+                folder_id: folderId
+            };
         }
         return { success: true, count: 0 };
 

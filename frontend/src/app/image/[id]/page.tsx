@@ -195,6 +195,25 @@ export default function ImageDetailPage({
         return match ? match[1] : null;
     };
 
+    // Format timestamp as MM:SS
+    const formatTimestamp = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Get video URL with timestamp for YouTube
+    const getVideoUrlWithTimestamp = (url: string, timestamp?: number): string => {
+        if (!url) return "#";
+        if (timestamp === undefined) return url;
+
+        const youtubeId = getYouTubeId(url);
+        if (youtubeId) {
+            return `https://www.youtube.com/watch?v=${youtubeId}&t=${Math.floor(timestamp)}`;
+        }
+        return url;
+    };
+
     const truncatePrompt = (prompt: string, maxLength: number = 200) => {
         if (prompt.length <= maxLength) return prompt;
         return prompt.substring(0, maxLength) + "...";
@@ -324,6 +343,47 @@ export default function ImageDetailPage({
                             {/* Overview Content */}
                             {activeTab === "overview" && (
                                 <div className="p-4 space-y-5 border-t border-border-subtle bg-white/2">
+                                    {/* Video Source - Subtle inline design */}
+                                    {youtubeId && (
+                                        <div className="flex items-center gap-3">
+                                            <a
+                                                href={getVideoUrlWithTimestamp(image.source_video_url || "", image.scene_start_time)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="group relative w-16 h-10 rounded overflow-hidden flex-shrink-0 hover:ring-2 hover:ring-red-500/50 transition-all"
+                                            >
+                                                <img
+                                                    src={`https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`}
+                                                    alt="Source video"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/20 transition-colors">
+                                                    <div className="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center">
+                                                        <svg className="w-2.5 h-2.5 text-white fill-current ml-0.5" viewBox="0 0 24 24">
+                                                            <path d="M8 5v14l11-7z" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-xs text-text-tertiary">
+                                                    Frame from video
+                                                    {image.scene_start_time !== undefined && (
+                                                        <a
+                                                            href={getVideoUrlWithTimestamp(image.source_video_url || "", image.scene_start_time)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="ml-2 text-red-400 hover:underline"
+                                                        >
+                                                            @ {formatTimestamp(image.scene_start_time)}
+                                                        </a>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+
                                     {/* Prompt */}
                                     {image.prompt && (
                                         <div>
@@ -549,48 +609,50 @@ export default function ImageDetailPage({
                                 </div>
                             )}
                         </div>
-                    </div>
-                </div>
+                    </div >
+                </div >
 
                 {/* Similar Images - always shown at bottom, full width */}
-                {similarImages.length > 0 && (
-                    <div className="mt-12">
-                        <h2 className="text-xl font-semibold mb-6">More like this</h2>
-                        <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4">
-                            {similarImages.map((img) => (
-                                <ImageCard
-                                    key={img.id}
-                                    id={img.id}
-                                    imageUrl={img.image_url}
-                                    mood={img.mood}
-                                    colors={img.colors}
-                                />
-                            ))}
-                        </div>
-
-                        {/* Load More Button */}
-                        {hasMoreSimilar && (
-                            <div className="flex justify-center pt-8 pb-4">
-                                <button
-                                    onClick={loadMoreSimilar}
-                                    disabled={loadingMoreSimilar}
-                                    className="px-6 py-3 bg-white/5 border border-white/20 text-sm font-medium hover:bg-white/10 transition-all disabled:opacity-50 flex items-center gap-2"
-                                >
-                                    {loadingMoreSimilar ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Loading...
-                                        </>
-                                    ) : (
-                                        "Load more"
-                                    )}
-                                </button>
+                {
+                    similarImages.length > 0 && (
+                        <div className="mt-12">
+                            <h2 className="text-xl font-semibold mb-6">More like this</h2>
+                            <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4">
+                                {similarImages.map((img) => (
+                                    <ImageCard
+                                        key={img.id}
+                                        id={img.id}
+                                        imageUrl={img.image_url}
+                                        mood={img.mood}
+                                        colors={img.colors}
+                                    />
+                                ))}
                             </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </AppShell>
+
+                            {/* Load More Button */}
+                            {hasMoreSimilar && (
+                                <div className="flex justify-center pt-8 pb-4">
+                                    <button
+                                        onClick={loadMoreSimilar}
+                                        disabled={loadingMoreSimilar}
+                                        className="px-6 py-3 bg-white/5 border border-white/20 text-sm font-medium hover:bg-white/10 transition-all disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {loadingMoreSimilar ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Loading...
+                                            </>
+                                        ) : (
+                                            "Load more"
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+            </div >
+        </AppShell >
     );
 }
 

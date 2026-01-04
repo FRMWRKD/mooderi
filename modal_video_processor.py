@@ -401,6 +401,56 @@ def is_youtube_url(url: str) -> bool:
     return any(x in urlparse(url).netloc.lower() for x in ['youtube.com', 'youtu.be'])
 
 
+def is_instagram_url(url: str) -> bool:
+    return 'instagram.com' in urlparse(url).netloc.lower()
+
+
+def is_tiktok_url(url: str) -> bool:
+    return any(x in urlparse(url).netloc.lower() for x in ['tiktok.com', 'vm.tiktok.com'])
+
+
+def is_vimeo_url(url: str) -> bool:
+    return 'vimeo.com' in urlparse(url).netloc.lower()
+
+
+def is_supported_platform(url: str) -> bool:
+    """Check if URL is from a platform that yt-dlp can handle."""
+    return is_youtube_url(url) or is_instagram_url(url) or is_tiktok_url(url) or is_vimeo_url(url)
+
+
+def download_with_ytdlp(url: str, output_path: Path, cookies_path: Path = None) -> dict:
+    """Download video using yt-dlp - works for YouTube, Instagram, TikTok, Vimeo, etc."""
+    import subprocess
+    
+    cmd = [
+        "yt-dlp", 
+        "-f", "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+        "-o", str(output_path), 
+        "--no-playlist", 
+        "--merge-output-format", "mp4",
+        "--geo-bypass",
+    ]
+    
+    # Add YouTube-specific options
+    if is_youtube_url(url):
+        cmd.extend(["--extractor-args", "youtube:player_client=android,web"])
+        if cookies_path and cookies_path.exists():
+            cmd.extend(["--cookies", str(cookies_path)])
+    
+    cmd.append(url)
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            return {"success": True}
+        else:
+            return {"error": f"yt-dlp failed: {result.stderr[:500]}"}
+    except subprocess.TimeoutExpired:
+        return {"error": "Download timeout (>5 min)"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def extract_youtube_id(url: str) -> str:
     """Extract YouTube video ID from URL."""
     import re
@@ -570,13 +620,24 @@ def process_video(video_url: str, quality_mode: str = "medium",
     t = time.time()
     print(f"[1/5] Downloading... (quality_mode={quality_mode})")
     cookies_path = work_dir / "cookies.txt"
+    
+    # Use RapidAPI for YouTube (to bypass IP blocks), yt-dlp for all other platforms
     if is_youtube_url(video_url):
         cookies = os.environ.get("YOUTUBE_COOKIES", "")
         if cookies:
             cookies_path.write_text(cookies)
         dl = download_youtube(video_url, video_path, cookies_path)
+    elif is_supported_platform(video_url):
+        # Use yt-dlp for Instagram, TikTok, Vimeo
+        platform = "Instagram" if is_instagram_url(video_url) else \
+                   "TikTok" if is_tiktok_url(video_url) else \
+                   "Vimeo" if is_vimeo_url(video_url) else "video platform"
+        print(f"[1/5] Detected {platform}, using yt-dlp...")
+        dl = download_with_ytdlp(video_url, video_path, cookies_path)
     else:
+        # Direct HTTP download for direct video URLs
         import httpx
+        print(f"[1/5] Direct URL download...")
         with httpx.Client(timeout=120, follow_redirects=True) as c:
             r = c.get(video_url)
             video_path.write_bytes(r.content) if r.status_code == 200 else None

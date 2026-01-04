@@ -6,6 +6,7 @@ const { extractConceptsWithAi } = require('./services/straico');
 const { extractConcepts, generateBoardName } = require('./utils/concepts');
 const { generateEmbedding } = require('./services/embeddings');
 const { startVideoProcessing, getJobStatus, uploadApprovedFramesToDb } = require('./services/video');
+const { createCheckout, getCustomerPortalUrl, handleSubscriptionEvent, handleOrderEvent } = require('./services/polar');
 
 require('dotenv').config();
 
@@ -262,6 +263,55 @@ app.get('/api/image/:id/similar', async (req, res) => {
 
     } catch (e) {
         return res.status(500).json({ error: e.message });
+    }
+});
+
+// Polar - Create checkout
+app.post('/api/polar/checkout', async (req, res) => {
+    const { productPriceId, email } = req.body;
+
+    if (!productPriceId || !email) {
+        return res.status(400).json({ error: 'Product price ID and email required' });
+    }
+
+    const successUrl = `${req.headers.origin || 'https://frontend-12k7w2bs6-theo-vas-projects.vercel.app'}/credits/success`;
+
+    const result = await createCheckout(productPriceId, email, successUrl);
+    return res.json(result);
+});
+
+// Polar - Get customer portal URL
+app.get('/api/polar/portal/:customerId', async (req, res) => {
+    try {
+        const url = await getCustomerPortalUrl(req.params.customerId);
+        return res.json({ url });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// Polar - Webhook endpoint
+app.post('/api/polar/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+        // Parse webhook event
+        const event = JSON.parse(req.body.toString());
+
+        // Validate webhook signature if needed
+        // const signature = req.headers['polar-signature'];
+
+        const { type } = event;
+
+        // Handle different event types
+        if (type.startsWith('subscription.')) {
+            await handleSubscriptionEvent(event, supabase);
+        } else if (type.startsWith('order.')) {
+            await handleOrderEvent(event, supabase);
+        }
+
+        return res.json({ received: true });
+    } catch (error) {
+        console.error('Polar webhook error:', error);
+        return res.status(400).json({ error: error.message });
     }
 });
 

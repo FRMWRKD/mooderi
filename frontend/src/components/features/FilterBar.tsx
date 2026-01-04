@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Lightbulb, X, ChevronDown, Check, Sun, Camera, Tag } from "lucide-react";
+import { X, ChevronDown, Check, Sun, Camera, Tag, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Types
@@ -281,51 +281,22 @@ export function FilterBar({
     const hasActiveFilters = selectedMoods.length > 0 || selectedColors.length > 0 || selectedLighting.length > 0 || selectedCameraShots.length > 0 || selectedTags.length > 0;
 
     return (
-        <div className="relative sticky top-0 z-30 pt-4 pb-2 bg-black -mx-4 px-4 border-b border-white/10 space-y-4" ref={filterRef}>
+        <div className="relative z-20 pb-2" ref={filterRef}>
 
-            {/* Main Search Bar */}
-            <form onSubmit={handleSearchSubmit} className="relative group max-w-3xl mx-auto">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                    <Search className="w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                </div>
-                <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search for a mood, style, color, or vibe..."
-                    className="w-full bg-transparent border border-white/20 py-3.5 pl-12 pr-40 text-lg focus:outline-none focus:border-white transition-all placeholder:text-white/30"
-                />
-
-                {/* Search Type Toggle */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center border border-white/20 p-1">
-                    <button
-                        type="button"
-                        onClick={() => setSearchType("text")}
-                        className={cn(
-                            "px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-all",
-                            searchType === "text" ? "bg-white text-black" : "text-white/50 hover:text-white"
-                        )}
-                    >
-                        Text
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setSearchType("semantic")}
-                        className={cn(
-                            "px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-all flex items-center gap-1",
-                            searchType === "semantic" ? "bg-white text-black" : "text-white/50 hover:text-white"
-                        )}
-                    >
-                        <Lightbulb className="w-3 h-3" />
-                        AI
-                    </button>
-                </div>
-            </form>
-
-            {/* Filter Pills Row - Show shimmer while loading */}
+            {/* Filter Pills Row - Always visible */}
             {isLoading ? (
                 <FilterShimmer />
             ) : (
                 <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {/* Clear all button when filters active */}
+                    {hasActiveFilters && (
+                        <button
+                            onClick={clearAll}
+                            className="h-9 px-3 text-xs text-white/40 hover:text-red-400 border border-white/10 hover:border-red-400/30 transition-colors"
+                        >
+                            Clear all
+                        </button>
+                    )}
 
                     {/* Mood Filter */}
                     <FilterDropdown
@@ -507,47 +478,6 @@ export function FilterBar({
                 </div>
             )}
 
-            {/* Active Filters Display */}
-            {hasActiveFilters && (
-                <div className="flex items-center justify-center gap-2 flex-wrap pb-2">
-                    {selectedMoods.map(mood => (
-                        <span key={mood} className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-xs font-medium text-white border border-white/20">
-                            {mood}
-                            <button onClick={() => setSelectedMoods(prev => toggleItem(prev, mood))} className="hover:text-red-400 ml-1 hover:bg-white/10 p-0.5"><X className="w-3 h-3" /></button>
-                        </span>
-                    ))}
-                    {selectedLighting.map(light => (
-                        <span key={light} className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-xs font-medium text-white border border-white/20">
-                            <Sun className="w-3 h-3" /> {light}
-                            <button onClick={() => setSelectedLighting(prev => toggleItem(prev, light))} className="hover:text-red-400 ml-1 hover:bg-white/10 p-0.5"><X className="w-3 h-3" /></button>
-                        </span>
-                    ))}
-                    {selectedCameraShots.map(shot => (
-                        <span key={shot} className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-xs font-medium text-white border border-white/20">
-                            <Camera className="w-3 h-3" /> {shot}
-                            <button onClick={() => setSelectedCameraShots(prev => toggleItem(prev, shot))} className="hover:text-red-400 ml-1 hover:bg-white/10 p-0.5"><X className="w-3 h-3" /></button>
-                        </span>
-                    ))}
-                    {selectedColors.map(color => (
-                        <span key={color} className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-xs font-medium text-white border border-white/20">
-                            <span className="w-2.5 h-2.5 border border-white/20" style={{ backgroundColor: color }} />
-                            <button onClick={() => setSelectedColors(prev => toggleItem(prev, color))} className="hover:text-red-400 ml-1 hover:bg-white/10 p-0.5"><X className="w-3 h-3" /></button>
-                        </span>
-                    ))}
-                    {selectedTags.map(tag => (
-                        <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-xs font-medium text-white border border-white/20">
-                            #{tag}
-                            <button onClick={() => setSelectedTags(prev => toggleItem(prev, tag))} className="hover:text-red-400 ml-1 hover:bg-white/10 p-0.5"><X className="w-3 h-3" /></button>
-                        </span>
-                    ))}
-                    <button
-                        onClick={clearAll}
-                        className="text-xs text-white/40 hover:text-white underline ml-2"
-                    >
-                        Clear all
-                    </button>
-                </div>
-            )}
         </div>
     );
 }
