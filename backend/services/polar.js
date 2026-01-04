@@ -14,12 +14,12 @@ const polar = new Polar({
  */
 async function createCheckout(productPriceId, customerEmail, successUrl) {
     try {
+        // Polar SDK v0.42+ requires products array format
         const checkout = await polar.checkouts.create({
-            productPriceId,
+            products: [{ productPriceId }],
             customerEmail,
             successUrl,
-            // Store custom data to identify the purchase
-            customData: {
+            metadata: {
                 source: 'moodboard',
                 timestamp: new Date().toISOString(),
             },
