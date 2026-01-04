@@ -2,6 +2,7 @@
 
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { VideoProcessingQueue } from "@/components/features/VideoProcessingQueue";
 import { useGlobalShortcuts, KEYBOARD_SHORTCUTS } from "@/hooks/useKeyboardShortcuts";
 import { useState } from "react";
 import { Keyboard, X } from "lucide-react";
@@ -21,10 +22,13 @@ export function AppShell({ children }: AppShellProps) {
                 <TopBar />
                 <div className="flex-1 overflow-y-auto p-8">{children}</div>
 
-                {/* Keyboard Shortcut Help Button */}
+                {/* Video Processing Queue - Bottom Right */}
+                <VideoProcessingQueue />
+
+                {/* Keyboard Shortcut Help Button - Positioned to not overlap queue */}
                 <button
                     onClick={() => setShowShortcuts(true)}
-                    className="fixed bottom-6 right-6 w-10 h-10 bg-background-elevated border border-border-subtle rounded-full flex items-center justify-center text-text-tertiary hover:text-white hover:bg-white/10 transition-colors shadow-lg z-40"
+                    className="fixed bottom-6 right-[420px] w-10 h-10 bg-background-elevated border border-border-subtle rounded-full flex items-center justify-center text-text-tertiary hover:text-white hover:bg-white/10 transition-colors shadow-lg z-30"
                     title="Keyboard shortcuts (?)"
                 >
                     <Keyboard className="w-5 h-5" />

@@ -9,10 +9,12 @@ const nextConfig = {
         ],
     },
     async rewrites() {
-        // Production: Elest.io, Local dev: localhost:3000
-        const backendUrl = process.env.NODE_ENV === 'production'
-            ? 'https://mooderi-u26413.vm.elestio.app'
-            : (process.env.BACKEND_URL || 'http://127.0.0.1:3000');
+        // LOCAL_BACKEND_URL takes priority for local dev, otherwise use BACKEND_URL or fallback
+        const backendUrl = process.env.LOCAL_BACKEND_URL
+            || (process.env.NODE_ENV === 'development' ? 'http://localhost:6030' : null)
+            || process.env.BACKEND_URL
+            || 'http://localhost:6030';
+        console.log('Backend URL for rewrites:', backendUrl);
         return [
             {
                 // Proxy API calls to Node.js backend
@@ -24,3 +26,5 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+
+

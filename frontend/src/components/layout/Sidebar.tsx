@@ -167,59 +167,38 @@ export function Sidebar() {
                 </div>
             </div>
 
-            {/* User Profile */}
-            {user ? (
-                <Dropdown>
-                    <DropdownTrigger asChild>
-                        <button className="flex items-center gap-3 p-3 border border-white/20 hover:border-white/40 transition-all w-full">
-                            <div className="w-8 h-8 border border-white/40 flex items-center justify-center text-sm font-mono">
-                                {user.email?.charAt(0).toUpperCase() || "U"}
-                            </div>
-                            <div className="flex-1 text-left">
-                                <div className="text-sm font-medium truncate">
-                                    {user.user_metadata?.full_name || user.email?.split("@")[0]}
-                                </div>
-                                <div className="text-xs text-text-tertiary truncate">
-                                    {user.email}
-                                </div>
-                            </div>
-                            <ChevronDown className="w-4 h-4 text-text-tertiary" />
-                        </button>
-                    </DropdownTrigger>
-                    <DropdownContent align="start" className="w-52">
-                        <DropdownItem onClick={handleProfile}>
-                            <User className="w-4 h-4 mr-2" />
-                            Profile
-                        </DropdownItem>
-                        <DropdownItem onClick={handleSettings}>
-                            <Settings className="w-4 h-4 mr-2" />
-                            Settings
-                        </DropdownItem>
-                        <DropdownItem onClick={handleBuyCredits}>
-                            <CreditCard className="w-4 h-4 mr-2" />
-                            Buy Credits
-                        </DropdownItem>
-                        <DropdownSeparator />
-                        <DropdownItem className="text-red-400" onClick={handleLogout}>
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Logout
-                        </DropdownItem>
-                    </DropdownContent>
-                </Dropdown>
-            ) : (
+            {/* Bottom Actions */}
+            <div className="flex flex-col gap-1 pt-4 border-t border-white/10">
                 <Link
-                    href="/login"
-                    className="flex items-center gap-3 p-3 border border-white/20 hover:border-white/40 transition-all w-full"
+                    href="/settings"
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2 text-sm transition-all border-l-2",
+                        pathname === "/settings"
+                            ? "border-white text-white bg-white/5"
+                            : "border-transparent text-white/60 hover:text-white hover:border-white/40"
+                    )}
                 >
-                    <div className="w-8 h-8 border border-white/40 flex items-center justify-center">
-                        <LogIn className="w-4 h-4 text-white/60" />
-                    </div>
-                    <div className="flex-1 text-left">
-                        <div className="text-sm font-medium">Sign In</div>
-                        <div className="text-xs text-text-tertiary">Create an account</div>
-                    </div>
+                    <Settings className="w-4 h-4 opacity-60" />
+                    Settings
                 </Link>
-            )}
+                {user ? (
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-white/40 hover:text-red-400 transition-all border-l-2 border-transparent hover:border-red-400/40 w-full text-left"
+                    >
+                        <LogOut className="w-4 h-4 opacity-60" />
+                        Logout
+                    </button>
+                ) : (
+                    <Link
+                        href="/login"
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-white/60 hover:text-white transition-all border-l-2 border-transparent hover:border-white/40"
+                    >
+                        <LogIn className="w-4 h-4 opacity-60" />
+                        Sign In
+                    </Link>
+                )}
+            </div>
         </aside>
     );
 }

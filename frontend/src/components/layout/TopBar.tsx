@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell, Coins, Plus, Lightbulb } from "lucide-react";
+import { Search, Bell, Coins, Plus, Lightbulb, Video, FolderPlus, Sparkles, Upload, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
@@ -13,20 +13,37 @@ import {
     ModalFooter,
     ModalCloseButton,
 } from "@/components/ui/Modal";
+import {
+    Dropdown,
+    DropdownTrigger,
+    DropdownContent,
+    DropdownItem,
+    DropdownSeparator,
+} from "@/components/ui/Dropdown";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVideoJobs } from "@/contexts/VideoJobContext";
 import { CreditsModal } from "@/components/features/CreditsModal";
+import { FrameSelectionModal } from "@/components/features/FrameSelectionModal";
+import { UploadModal } from "@/components/features/UploadModal";
+import { SmartBoardModal } from "@/components/features/SmartBoardModal";
+import { NewBoardModal } from "@/components/features/NewBoardModal";
 
 export function TopBar() {
+    // Search state
     const [searchQuery, setSearchQuery] = useState("");
     const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+
+    // Video modal state
     const [videoUrl, setVideoUrl] = useState("");
     const [quality, setQuality] = useState<"strict" | "medium" | "high">("medium");
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Credits & notifications
     const [credits, setCredits] = useState<number>(100);
     const [unreadCount, setUnreadCount] = useState<number>(0);
     const [notifications, setNotifications] = useState<Array<{
@@ -39,8 +56,62 @@ export function TopBar() {
     }>>([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const { user } = useAuth();
+    const { addJob: addVideoJob, hasActiveJobs, activeCount } = useVideoJobs();
     const router = useRouter();
+    const pathname = usePathname();
     const [showCreditsModal, setShowCreditsModal] = useState(false);
+
+    // Video Processing State
+    const [activeJobId, setActiveJobId] = useState<string | null>(null);
+    const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+    const [showFrameSelection, setShowFrameSelection] = useState(false);
+    const [pendingFrames, setPendingFrames] = useState<string[]>([]);
+    const [pendingVideoUrl, setPendingVideoUrl] = useState("");
+
+    // Poll for job status
+    useEffect(() => {
+        if (!activeJobId) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const result = await api.getVideoStatus(activeJobId);
+                console.log("Job status:", result.data?.status);
+
+                if (result.data) {
+                    if (result.data.status === "pending_approval") {
+                        // Ready for frame selection
+                        const framesResult = await api.getVideoFrames(activeJobId);
+                        if (framesResult.data && framesResult.data.frames) {
+                            // Map Image objects to URL strings
+                            const frameUrls = framesResult.data.frames.map(f => f.image_url);
+                            // Get video source URL from first frame if available
+                            const videoSource = framesResult.data.frames[0]?.source_video_url || "";
+
+                            setPendingFrames(frameUrls);
+                            setPendingVideoUrl(videoSource);
+                            setPendingJobId(activeJobId);
+                            setShowFrameSelection(true);
+                            setActiveJobId(null); // Stop polling
+                        }
+                    } else if (result.data.status === "failed") {
+                        // Type assertion to bypass potential type mismatch if message is not in definition
+                        const errorMessage = (result.data as any).message || "Unknown error";
+                        setError("Analysis failed: " + errorMessage);
+                        setActiveJobId(null);
+                        setIsVideoModalOpen(true); // Re-open input modal to show error
+                    } else if (result.data.status === "completed") {
+                        setActiveJobId(null);
+                        router.push("/videos");
+                    }
+                }
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [activeJobId, router]);
+
 
     useEffect(() => {
         if (user) {
@@ -70,9 +141,11 @@ export function TopBar() {
         try {
             const result = await api.analyzeVideo(videoUrl, quality);
             if (result.data?.job_id) {
-                setIsOpen(false);
+                setActiveJobId(result.data.job_id);
+                addVideoJob(result.data.job_id, videoUrl); // Add to shared context
+                setIsVideoModalOpen(false); // Close input modal
                 setVideoUrl("");
-                router.push("/videos");
+                console.log("Started analysis, polling job:", result.data.job_id);
             } else {
                 setError(result.error || "Failed to start analysis");
             }
@@ -83,33 +156,71 @@ export function TopBar() {
         }
     };
 
-    const handleCancel = () => {
-        setIsOpen(false);
+    const handleCancelVideo = () => {
+        setIsVideoModalOpen(false);
         setVideoUrl("");
         setError(null);
+    };
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            const type = isSemanticSearch ? "semantic" : "text";
+            router.push(`/?q=${encodeURIComponent(searchQuery)}&type=${type}`);
+        }
     };
 
     return (
         <>
             <header className="h-[72px] flex items-center justify-between px-8 border-b border-white/20 bg-black sticky top-0 z-30">
-                {/* Logo - only visible on pages without sidebar */}
-                <div className="hidden">
-                    <span className="text-xl font-black tracking-tighter">MOODERI</span>
-                </div>
+                {/* Search Bar - Now in Header */}
+                <form onSubmit={handleSearch} className="flex-1 max-w-xl relative group">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <Search className="w-4 h-4 text-white/40 group-focus-within:text-white transition-colors" />
+                    </div>
+                    <input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search images..."
+                        className="w-full bg-white/5 border border-white/10 py-2 pl-10 pr-24 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/30 transition-all"
+                    />
+                    {/* Search Type Toggle */}
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
+                        <button
+                            type="button"
+                            onClick={() => setIsSemanticSearch(!isSemanticSearch)}
+                            className={`px-2 py-1 text-xs font-medium transition-all flex items-center gap-1 ${isSemanticSearch ? "bg-accent-purple text-white" : "text-white/50 hover:text-white"
+                                }`}
+                        >
+                            <Lightbulb className="w-3 h-3" />
+                            AI
+                        </button>
+                    </div>
+                </form>
 
                 {/* Spacer */}
                 <div className="flex-1" />
 
+                {/* Processing Indicator */}
+                {(activeJobId || hasActiveJobs) && (
+                    <div className="mr-4 flex items-center gap-3 px-4 py-2 bg-accent-blue/10 border border-accent-blue/30 rounded-full animate-pulse">
+                        <div className="w-2 h-2 bg-accent-blue rounded-full" />
+                        <span className="text-sm font-medium text-accent-blue">
+                            {activeCount > 1 ? `Processing ${activeCount} Videos...` : "Processing Video..."}
+                        </span>
+                    </div>
+                )}
+
                 {/* Actions */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {/* Credits Badge */}
                     <button
                         onClick={() => setShowCreditsModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 border border-white/20 hover:border-white/40 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 border border-white/20 hover:border-white/40 transition-colors text-sm"
                     >
                         <Coins className="w-4 h-4 text-white/60" />
-                        <span className="text-sm font-mono">
-                            <span className="font-medium">{credits}</span> Credits
+                        <span className="font-mono">
+                            <span className="font-medium">{credits}</span>
                         </span>
                     </button>
 
@@ -174,102 +285,153 @@ export function TopBar() {
                         )}
                     </div>
 
-                    {/* New Video Button */}
-                    <Modal open={isOpen} onOpenChange={setIsOpen}>
-                        <ModalTrigger asChild>
-                            <Button variant="accent" className="gap-2" onClick={() => setIsOpen(true)}>
+                    {/* Unified Add Dropdown */}
+                    <Dropdown>
+                        <DropdownTrigger asChild>
+                            <Button variant="accent" className="gap-2">
                                 <Plus className="w-4 h-4" />
-                                New Video
+                                Add
+                                <ChevronDown className="w-3 h-3 opacity-60" />
                             </Button>
-                        </ModalTrigger>
-                        <ModalContent className="max-w-md">
-                            <ModalHeader>
-                                <ModalTitle>Analyze Video</ModalTitle>
-                                <ModalCloseButton />
-                            </ModalHeader>
-                            <ModalBody className="space-y-6">
-                                <div>
-                                    <label className="text-sm text-text-secondary mb-2 block">
-                                        YouTube or Vimeo URL
-                                    </label>
-                                    <Input
-                                        placeholder="https://youtube.com/watch?v=..."
-                                        value={videoUrl}
-                                        onChange={(e) => setVideoUrl(e.target.value)}
-                                    />
-                                    {error && (
-                                        <p className="text-sm text-red-400 mt-2">{error}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="text-sm text-text-secondary mb-3 block">
-                                        Frame Selection Quality
-                                    </label>
-                                    <div className="space-y-2">
-                                        <QualityOption
-                                            value="strict"
-                                            label="Strict"
-                                            description="Fewer frames, highest quality"
-                                            badge="Saves credits"
-                                            isSelected={quality === "strict"}
-                                            onSelect={() => setQuality("strict")}
-                                        />
-                                        <QualityOption
-                                            value="medium"
-                                            label="Medium"
-                                            description="Balanced selection"
-                                            badge="Recommended"
-                                            isSelected={quality === "medium"}
-                                            onSelect={() => setQuality("medium")}
-                                        />
-                                        <QualityOption
-                                            value="high"
-                                            label="High"
-                                            description="More frames, minimal cuts"
-                                            badge="Most frames"
-                                            isSelected={quality === "high"}
-                                            onSelect={() => setQuality("high")}
-                                        />
-                                    </div>
-                                </div>
-
-                                <p className="text-xs text-text-tertiary flex items-center gap-1">
-                                    <span className="w-4 h-4 rounded-full border border-text-tertiary flex items-center justify-center text-[10px]">
-                                        i
-                                    </span>
-                                    Credits charged only for frames you approve.
-                                </p>
-                            </ModalBody>
-                            <ModalFooter>
-                                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-                                <Button
-                                    variant="default"
-                                    onClick={handleStartAnalysis}
-                                    disabled={isAnalyzing || !videoUrl.trim()}
-                                >
-                                    {isAnalyzing ? (
-                                        <>
-                                            <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
-                                            Analyzing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="mr-1">▶</span> Start Analysis
-                                        </>
-                                    )}
-                                </Button>
-                            </ModalFooter>
-                        </ModalContent>
-                    </Modal>
+                        </DropdownTrigger>
+                        <DropdownContent align="end" className="w-48">
+                            <DropdownItem onClick={() => setIsVideoModalOpen(true)}>
+                                <Video className="w-4 h-4 mr-2" />
+                                New Video
+                            </DropdownItem>
+                            <UploadModal
+                                trigger={
+                                    <DropdownItem onSelect={(e) => e.preventDefault()}>
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Upload Image
+                                    </DropdownItem>
+                                }
+                                onImageUploaded={() => router.refresh()}
+                            />
+                            <DropdownSeparator />
+                            <NewBoardModal
+                                trigger={
+                                    <DropdownItem onSelect={(e) => e.preventDefault()}>
+                                        <FolderPlus className="w-4 h-4 mr-2" />
+                                        New Board
+                                    </DropdownItem>
+                                }
+                                onBoardCreated={() => router.push("/boards")}
+                            />
+                            <SmartBoardModal
+                                trigger={
+                                    <DropdownItem onSelect={(e) => e.preventDefault()}>
+                                        <Sparkles className="w-4 h-4 mr-2" />
+                                        Smart Board
+                                    </DropdownItem>
+                                }
+                            />
+                        </DropdownContent>
+                    </Dropdown>
                 </div>
             </header>
+
+            {/* Video Analysis Modal */}
+            <Modal open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+                <ModalContent className="max-w-md">
+                    <ModalHeader>
+                        <ModalTitle>Analyze Video</ModalTitle>
+                        <ModalCloseButton />
+                    </ModalHeader>
+                    <ModalBody className="space-y-6">
+                        <div>
+                            <label className="text-sm text-text-secondary mb-2 block">
+                                YouTube or Vimeo URL
+                            </label>
+                            <Input
+                                placeholder="https://youtube.com/watch?v=..."
+                                value={videoUrl}
+                                onChange={(e) => setVideoUrl(e.target.value)}
+                            />
+                            {error && (
+                                <p className="text-sm text-red-400 mt-2">{error}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm text-text-secondary mb-3 block">
+                                Frame Selection Quality
+                            </label>
+                            <div className="space-y-2">
+                                <QualityOption
+                                    value="strict"
+                                    label="Strict"
+                                    description="Fewer frames, highest quality"
+                                    badge="Saves credits"
+                                    isSelected={quality === "strict"}
+                                    onSelect={() => setQuality("strict")}
+                                />
+                                <QualityOption
+                                    value="medium"
+                                    label="Medium"
+                                    description="Balanced selection"
+                                    badge="Recommended"
+                                    isSelected={quality === "medium"}
+                                    onSelect={() => setQuality("medium")}
+                                />
+                                <QualityOption
+                                    value="high"
+                                    label="High"
+                                    description="More frames, minimal cuts"
+                                    badge="Most frames"
+                                    isSelected={quality === "high"}
+                                    onSelect={() => setQuality("high")}
+                                />
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-text-tertiary flex items-center gap-1">
+                            <span className="w-4 h-4 rounded-full border border-text-tertiary flex items-center justify-center text-[10px]">
+                                i
+                            </span>
+                            Credits charged only for frames you approve.
+                        </p>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button variant="secondary" onClick={handleCancelVideo}>Cancel</Button>
+                        <Button
+                            variant="default"
+                            onClick={handleStartAnalysis}
+                            disabled={isAnalyzing || !videoUrl.trim()}
+                        >
+                            {isAnalyzing ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                                    Analyzing...
+                                </>
+                            ) : (
+                                <>
+                                    <span className="mr-1">▶</span> Start Analysis
+                                </>
+                            )}
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
 
             {/* Credits Modal */}
             <CreditsModal
                 isOpen={showCreditsModal}
                 onClose={() => setShowCreditsModal(false)}
                 credits={credits}
+            />
+
+            {/* Frame Selection Modal */}
+            <FrameSelectionModal
+                isOpen={showFrameSelection}
+                onClose={() => setShowFrameSelection(false)}
+                jobId={pendingJobId || ""}
+                frames={pendingFrames}
+                videoUrl={pendingVideoUrl}
+                onComplete={() => {
+                    setPendingFrames([]);
+                    router.push("/videos");
+                }}
             />
         </>
     );
