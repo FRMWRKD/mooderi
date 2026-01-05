@@ -8,7 +8,7 @@ description: Account credentials and configuration for MoodBoard deployment
 - **Email:** frmwrkd.media@gmail.com
 - **Account:** frmwrkdmedia-5489
 - **Project:** frontend
-- **Live URL:** https://frontend-12k7w2bs6-theo-vas-projects.vercel.app
+- **Live URL:** https://frontend-seven-ecru-44.vercel.app
 
 ## GitHub
 - **Repository:** https://github.com/ttoo17/mooderi

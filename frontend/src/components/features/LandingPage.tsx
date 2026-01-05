@@ -215,6 +215,12 @@ function ContactModal({ onClose }: { onClose: () => void }) {
 function ImageModal({ image, onClose }: { image: Image | null; onClose: () => void }) {
     if (!image) return null;
 
+    // Get prompt from multiple sources: prompt field, generated_prompts.text_to_image, or structured_analysis.short_description
+    const displayPrompt = image.prompt
+        || image.generated_prompts?.text_to_image
+        || image.generated_prompts?.structured_analysis?.short_description
+        || "No prompt available.";
+
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-6 md:p-12" onClick={onClose}>
             <motion.div
@@ -234,11 +240,11 @@ function ImageModal({ image, onClose }: { image: Image | null; onClose: () => vo
                 </div>
                 <div className="flex-1 overflow-auto p-4 min-h-0">
                     <h3 className="text-[10px] uppercase tracking-widest text-white/50 mb-2">Prompt</h3>
-                    <p className="font-mono text-xs leading-relaxed text-white/90">{image.prompt || "No prompt available."}</p>
+                    <p className="font-mono text-xs leading-relaxed text-white/90">{displayPrompt}</p>
                 </div>
                 <div className="flex-none border-t-2 border-white p-4 flex items-center justify-between">
                     <div className="flex gap-6 text-xs uppercase tracking-widest">
-                        <span><span className="text-white/50">Mood:</span> {image.mood || "N/A"}</span>
+                        <span><span className="text-white/50">Mood:</span> {image.mood || image.generated_prompts?.structured_analysis?.mood?.emotion || "N/A"}</span>
                         <span><span className="text-white/50">Score:</span> {image.aesthetic_score?.toFixed(1) || "N/A"}</span>
                     </div>
                     <button className="h-8 px-4 border-2 border-white hover:bg-white hover:text-black transition-colors text-xs uppercase tracking-widest">Copy Prompt</button>

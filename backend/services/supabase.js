@@ -27,7 +27,12 @@ const getPublicImages = async (limit = 50, sortBy = 'newest') => {
                     offset_count: 0
                 });
                 if (!error && data && data.length > 0) {
-                    return data;
+                    // Filter to only include images with prompts
+                    const withPrompts = data.filter(img =>
+                        (img.prompt && img.prompt.trim() !== '') ||
+                        img.generated_prompts !== null
+                    );
+                    if (withPrompts.length > 0) return withPrompts;
                 }
                 // Fallback to newest if ranked fails or is empty
                 console.log("Ranked RPC failed or empty, falling back to newest");
@@ -38,7 +43,12 @@ const getPublicImages = async (limit = 50, sortBy = 'newest') => {
             sortBy = 'newest';
         }
 
-        let query = supabase.from('images').select('*').eq('is_public', true);
+        // Query with filter for images that have prompts
+        let query = supabase
+            .from('images')
+            .select('*')
+            .eq('is_public', true)
+            .or('prompt.neq.,generated_prompts.not.is.null');
 
         if (sortBy === 'newest') query = query.order('created_at', { ascending: false });
         else if (sortBy === 'popular') query = query.order('likes', { ascending: false });
