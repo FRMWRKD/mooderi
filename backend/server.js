@@ -143,6 +143,148 @@ app.get('/api/filter-options', async (req, res) => {
     }
 });
 
+// Filtered images endpoint (for My Images and filtered gallery)
+app.get('/api/images/filter', async (req, res) => {
+    try {
+        const moods = [].concat(req.query.mood || []).filter(Boolean);
+        const colors = [].concat(req.query.colors || []).filter(Boolean);
+        const lighting = [].concat(req.query.lighting || []).filter(Boolean);
+        const cameraShots = [].concat(req.query.camera_shot || []).filter(Boolean);
+        const tags = [].concat(req.query.tags || []).filter(Boolean);
+        const minScore = parseFloat(req.query.min_score) || null;
+        const sourceType = req.query.source_type;
+        const sort = req.query.sort || 'ranked';
+        const limit = Math.min(parseInt(req.query.limit || 50), 100);
+        const offset = parseInt(req.query.offset || 0);
+
+        let query = supabase
+            .from('images')
+            .select('id, image_url, prompt, mood, lighting, colors, tags, aesthetic_score, likes, dislikes, generated_prompts, source_video_url, is_public')
+            .eq('is_public', true);
+
+        // Apply filters
+        if (moods.length > 0) {
+            query = query.in('mood', moods);
+        }
+        if (lighting.length > 0) {
+            query = query.in('lighting', lighting);
+        }
+        if (minScore) {
+            query = query.gte('aesthetic_score', minScore);
+        }
+        if (sourceType === 'video_import') {
+            query = query.not('source_video_url', 'is', null);
+        }
+        if (tags.length > 0) {
+            query = query.contains('tags', tags);
+        }
+
+        // Apply sorting
+        if (sort === 'ranked' || sort === 'rating') {
+            query = query.order('aesthetic_score', { ascending: false, nullsFirst: false });
+        } else if (sort === 'newest') {
+            query = query.order('created_at', { ascending: false });
+        } else if (sort === 'popular') {
+            query = query.order('likes', { ascending: false, nullsFirst: false });
+        } else {
+            query = query.order('created_at', { ascending: false });
+        }
+
+        const { data, error } = await query.range(offset, offset + limit - 1);
+
+        if (error) throw error;
+
+        return res.json({
+            images: data || [],
+            count: (data || []).length,
+            has_more: (data || []).length >= limit
+        });
+    } catch (e) {
+        console.error('Filter images error:', e);
+        res.status(500).json({ error: e.message, images: [], count: 0, has_more: false });
+    }
+});
+
+// Notifications endpoint
+app.get('/api/notifications', async (req, res) => {
+    const token = getUserFromToken(req);
+    const limit = parseInt(req.query.limit || 20);
+
+    if (!token) {
+        // Return empty for unauthenticated users
+        return res.json({ notifications: [], unread_count: 0 });
+    }
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (!user) {
+            return res.json({ notifications: [], unread_count: 0 });
+        }
+
+        // Get notifications for user
+        const { data: notifications, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            // Table might not exist - return empty
+            console.log('Notifications table error:', error.message);
+            return res.json({ notifications: [], unread_count: 0 });
+        }
+
+        const unreadCount = (notifications || []).filter(n => !n.is_read).length;
+
+        return res.json({
+            notifications: notifications || [],
+            unread_count: unreadCount
+        });
+    } catch (e) {
+        console.error('Get notifications error:', e);
+        res.json({ notifications: [], unread_count: 0 });
+    }
+});
+
+// Mark notifications as read
+app.post('/api/notifications/read', async (req, res) => {
+    const token = getUserFromToken(req);
+
+    if (!token) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        const { notification_id } = req.body;
+
+        if (notification_id) {
+            // Mark single notification as read
+            await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .eq('id', notification_id)
+                .eq('user_id', user.id);
+        } else {
+            // Mark all as read
+            await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .eq('user_id', user.id);
+        }
+
+        return res.json({ success: true });
+    } catch (e) {
+        console.error('Mark notifications read error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Smart Board Parse
 app.post('/api/smart-board/parse', async (req, res) => {
     const prompt = (req.body.prompt || '').trim();
