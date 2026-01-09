@@ -12,11 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const { image_base64, image_url } = await req.json()
+    // Parse request body ONCE at the beginning
+    const requestBody = await req.json()
+    const { image_base64, image_url, image_id } = requestBody
+    
     const visionatiKey = Deno.env.get('VISIONATI_API_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!visionatiKey) throw new Error('Missing VISIONATI_API_KEY')
     if (!image_base64 && !image_url) throw new Error('Must provide image_base64 or image_url')
+
+    console.log(`[analyze-image] Starting analysis for image_id=${image_id}, url=${image_url?.substring(0, 50)}...`)
 
     // Prepare Payload - request structured JSON analysis
     const jsonPrompt = `Analyze this image and return ONLY valid JSON (no markdown, no explanation).
@@ -42,17 +49,17 @@ Be extremely detailed in descriptions. Output ONLY the JSON object.`;
     }
     
     if (image_base64) {
-        // Use provided base64 directly
         payload.file = image_base64
-        console.log("Using provided base64 image")
+        console.log("[analyze-image] Using provided base64 image")
     } else if (image_url) {
-        // Try passing URL directly to Visionati (faster, no conversion needed)
         payload.url = image_url
-        console.log("Using image URL directly:", image_url)
+        console.log("[analyze-image] Using image URL directly")
     }
 
-    // Call Visionati
-    console.log("Sending request to Visionati...")
+    // ============================================
+    // STEP 1: Call Visionati for image analysis
+    // ============================================
+    console.log("[analyze-image] Step 1: Calling Visionati...")
     const response = await fetch('https://api.visionati.com/api/fetch', {
         method: 'POST',
         headers: {
@@ -71,7 +78,7 @@ Be extremely detailed in descriptions. Output ONLY the JSON object.`;
     
     // Handle Async Polling
     if (result.response_uri) {
-        console.log("Async response received. Polling...", result.response_uri)
+        console.log("[analyze-image] Async response received. Polling...", result.response_uri)
         const pollUrl = result.response_uri
         let attempts = 0
         const maxAttempts = 30 // 30 * 2s = 60s timeout
@@ -86,35 +93,32 @@ Be extremely detailed in descriptions. Output ONLY the JSON object.`;
             
             if (pollResp.ok) {
                 const pollResult = await pollResp.json()
-                console.log(`Poll attempt ${attempts + 1}/${maxAttempts}: status=${pollResult.status || 'unknown'}`)
+                console.log(`[analyze-image] Poll attempt ${attempts + 1}/${maxAttempts}: status=${pollResult.status || 'unknown'}`)
                 
-                // Check if assets are ready
                 if (pollResult.all && pollResult.all.assets) {
                     result = pollResult
                     pollingSuccess = true
-                    console.log("Polling complete - assets received")
+                    console.log("[analyze-image] Polling complete - assets received")
                     break
                 }
-                // Check failed status
                 if (pollResult.status === 'failed') {
                     throw new Error("Visionati processing failed during polling")
                 }
             } else {
-                console.log(`Poll attempt ${attempts + 1}/${maxAttempts}: HTTP ${pollResp.status}`)
+                console.log(`[analyze-image] Poll attempt ${attempts + 1}/${maxAttempts}: HTTP ${pollResp.status}`)
             }
             attempts++
         }
         
-        // Validate we got a result
         if (!pollingSuccess) {
-            console.error("Polling timed out after max attempts - no valid assets received")
+            console.error("[analyze-image] Polling timed out after max attempts")
             throw new Error("Visionati polling timed out - no result received after 60s")
         }
     }
 
-    // Parse Logic
+    // Parse Visionati response
     const allData = result.all || {}
-    let prompt = ''
+    let visionatiDescription = ''
     let colors: string[] = []
     let tags: string[] = []
     let structuredAnalysis: any = null
@@ -122,56 +126,58 @@ Be extremely detailed in descriptions. Output ONLY the JSON object.`;
     if (allData.assets && allData.assets.length > 0) {
         const asset = allData.assets[0]
         
-        // Descriptions
         if (asset.descriptions && asset.descriptions.length > 0) {
-            prompt = asset.descriptions[0].description || ''
+            visionatiDescription = asset.descriptions[0].description || ''
         } else if (allData.descriptions && allData.descriptions.length > 0) {
-            prompt = allData.descriptions[0].description || ''
+            visionatiDescription = allData.descriptions[0].description || ''
         }
         
-        // Colors
         const colorData = asset.colors || allData.colors || {}
         colors = Object.keys(colorData).slice(0, 5)
         
-        // Tags
         const tagData = asset.tags || allData.tags || {}
         tags = Object.keys(tagData).slice(0, 10)
     } else {
         const desc = allData.descriptions || []
-        prompt = desc.length > 0 ? desc[0].description : ''
+        visionatiDescription = desc.length > 0 ? desc[0].description : ''
         colors = Object.keys(allData.colors || {}).slice(0, 5)
         tags = Object.keys(allData.tags || {}).slice(0, 10)
     }
 
-    // Try to parse JSON from the description
-    if (prompt) {
+    // Try to parse structured JSON from the description
+    if (visionatiDescription) {
         try {
-            // Remove markdown code blocks if present
-            let cleanedPrompt = prompt
+            let cleanedPrompt = visionatiDescription
                 .replace(/```json\s*/gi, '')
                 .replace(/```\s*/g, '')
                 .trim();
             
-            // Look for JSON object in the cleaned response
             const jsonMatch = cleanedPrompt.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 structuredAnalysis = JSON.parse(jsonMatch[0]);
-                console.log("Parsed structured analysis:", Object.keys(structuredAnalysis));
+                console.log("[analyze-image] Parsed structured analysis:", Object.keys(structuredAnalysis));
             }
         } catch (e) {
-            console.log("Could not parse JSON from response:", e);
+            console.log("[analyze-image] Could not parse JSON from response:", e);
         }
     }
 
-    console.log("Analysis success:", { hasStructured: !!structuredAnalysis, promptLen: prompt.length, colors })
+    console.log("[analyze-image] Visionati complete:", { 
+        hasStructured: !!structuredAnalysis, 
+        descriptionLen: visionatiDescription.length, 
+        colors: colors.length,
+        tags: tags.length 
+    })
 
-    // Generate embedding for the prompt
+    // ============================================
+    // STEP 2: Generate embedding for semantic search
+    // ============================================
     let embedding: number[] | null = null
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY')
     
-    if (prompt && googleApiKey) {
+    if (visionatiDescription && googleApiKey) {
         try {
-            console.log("Generating embedding for prompt...")
+            console.log("[analyze-image] Step 2: Generating embedding...")
             const embeddingResponse = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
                 {
@@ -179,7 +185,7 @@ Be extremely detailed in descriptions. Output ONLY the JSON object.`;
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: 'models/text-embedding-004',
-                        content: { parts: [{ text: prompt }] }
+                        content: { parts: [{ text: visionatiDescription.substring(0, 2000) }] }
                     })
                 }
             )
@@ -187,57 +193,134 @@ Be extremely detailed in descriptions. Output ONLY the JSON object.`;
             if (embeddingResponse.ok) {
                 const embeddingData = await embeddingResponse.json()
                 embedding = embeddingData.embedding?.values || null
-                console.log("Embedding generated:", embedding ? `${embedding.length} dimensions` : 'failed')
+                console.log("[analyze-image] Embedding generated:", embedding ? `${embedding.length} dimensions` : 'failed')
             } else {
-                console.error("Embedding API error:", embeddingResponse.status)
+                console.error("[analyze-image] Embedding API error:", embeddingResponse.status)
             }
         } catch (embError) {
-            console.error("Embedding generation failed:", embError)
+            console.error("[analyze-image] Embedding generation failed:", embError)
         }
     }
 
-    // If image_id provided, update the database with embedding
-    const { image_id } = await req.json().catch(() => ({}))
-    if (image_id && embedding) {
+    // ============================================
+    // STEP 3: Call Straico to generate AI prompts
+    // ============================================
+    let straicoPrompts: any = null
+    let finalPrompt = visionatiDescription // Fallback to Visionati description
+    
+    if (image_id && supabaseUrl && supabaseKey) {
         try {
-            const supabaseUrl = Deno.env.get('SUPABASE_URL')
-            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+            console.log("[analyze-image] Step 3: Calling Straico via generate-prompts...")
             
-            if (supabaseUrl && supabaseKey) {
-                const updateResponse = await fetch(
-                    `${supabaseUrl}/rest/v1/images?id=eq.${image_id}`,
-                    {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': supabaseKey,
-                            'Authorization': `Bearer ${supabaseKey}`,
-                            'Prefer': 'return=minimal'
-                        },
-                        body: JSON.stringify({ embedding })
-                    }
-                )
-                console.log("Database update:", updateResponse.ok ? 'success' : 'failed')
+            const promptsResponse = await fetch(
+                `${supabaseUrl}/functions/v1/generate-prompts`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image_id: image_id,
+                        image_url: image_url,
+                        analysis: {
+                            detailed_description: visionatiDescription,
+                            structured_analysis: structuredAnalysis
+                        }
+                    })
+                }
+            )
+            
+            if (promptsResponse.ok) {
+                straicoPrompts = await promptsResponse.json()
+                console.log("[analyze-image] Straico response:", Object.keys(straicoPrompts))
+                
+                // Use Straico's text_to_image as the main prompt
+                if (straicoPrompts.text_to_image) {
+                    finalPrompt = straicoPrompts.text_to_image
+                    console.log("[analyze-image] Using Straico prompt (length:", finalPrompt.length, ")")
+                }
+            } else {
+                const errText = await promptsResponse.text()
+                console.error("[analyze-image] Straico call failed:", promptsResponse.status, errText)
             }
+        } catch (straicoError) {
+            console.error("[analyze-image] Straico call error:", straicoError)
+        }
+    } else {
+        console.log("[analyze-image] Skipping Straico - missing image_id or Supabase credentials")
+    }
+
+    // ============================================
+    // STEP 4: Update database with all data
+    // ============================================
+    if (image_id && supabaseUrl && supabaseKey) {
+        try {
+            console.log("[analyze-image] Step 4: Updating database...")
+            
+            const updatePayload: any = {
+                colors: colors,
+                tags: tags
+            }
+            
+            // Add embedding if available
+            if (embedding && embedding.length === 768) {
+                updatePayload.embedding = embedding
+            }
+            
+            // Add Straico-generated prompts (this is the KEY fix!)
+            if (straicoPrompts && straicoPrompts.text_to_image) {
+                updatePayload.prompt = straicoPrompts.text_to_image
+                updatePayload.generated_prompts = straicoPrompts
+                console.log("[analyze-image] Storing Straico prompt in DB")
+            } else {
+                // Fallback: store structured short_description if no Straico
+                const shortDesc = structuredAnalysis?.short_description || visionatiDescription.substring(0, 500)
+                updatePayload.prompt = shortDesc
+                updatePayload.generated_prompts = {
+                    text_to_image: shortDesc,
+                    visionati_analysis: visionatiDescription,
+                    structured_analysis: structuredAnalysis
+                }
+                console.log("[analyze-image] Storing fallback prompt (Straico failed)")
+            }
+            
+            const updateResponse = await fetch(
+                `${supabaseUrl}/rest/v1/images?id=eq.${image_id}`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': supabaseKey,
+                        'Authorization': `Bearer ${supabaseKey}`,
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify(updatePayload)
+                }
+            )
+            console.log("[analyze-image] Database update:", updateResponse.ok ? 'SUCCESS' : 'FAILED')
         } catch (dbError) {
-            console.error("Database update failed:", dbError)
+            console.error("[analyze-image] Database update failed:", dbError)
         }
     }
 
+    console.log("[analyze-image] Pipeline complete!")
+    
     return new Response(JSON.stringify({
         success: true,
-        prompt,
+        prompt: finalPrompt,
         colors,
         tags,
         structured_analysis: structuredAnalysis,
-        embedding: embedding,  // Return full embedding array for DB storage
+        generated_prompts: straicoPrompts,
+        embedding: embedding,
         raw: result
     }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (error) {
-    console.error("Error:", error)
+    console.error("[analyze-image] Error:", error)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
