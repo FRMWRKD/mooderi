@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
     title: "MoodBoard - Visual Reference Library",
-    description: "AI-powered moodboard creation from video content",
+    description: "AI-powered moodboard creation from video content - v2.1.0",
 };
 
 export default function RootLayout({
