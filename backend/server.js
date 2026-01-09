@@ -449,6 +449,349 @@ app.post('/api/polar/webhook', express.raw({ type: 'application/json' }), async 
     }
 });
 
+// ============================================
+// BOARDS API ENDPOINTS
+// ============================================
+
+// Helper: Extract user_id from Authorization header
+function getUserFromToken(req) {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) return null;
+    // For now, we'll use the Supabase client to verify the token
+    // In production, you'd verify the JWT properly
+    return auth.split(' ')[1]; // Return token for Supabase auth
+}
+
+// Get all boards for user
+app.get('/api/boards', async (req, res) => {
+    try {
+        // Get user token if authenticated
+        const token = getUserFromToken(req);
+        let userId = null;
+
+        if (token) {
+            try {
+                const { data: { user } } = await supabase.auth.getUser(token);
+                userId = user?.id;
+            } catch (e) {
+                console.log('Token verification failed, showing public boards only');
+            }
+        }
+
+        let query = supabase.from('boards').select('*');
+
+        if (userId) {
+            query = query.eq('user_id', userId);
+        } else {
+            query = query.eq('is_public', true);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return res.json({ boards: data || [], count: (data || []).length });
+    } catch (e) {
+        console.error('Get boards error:', e);
+        res.status(500).json({ error: e.message, boards: [] });
+    }
+});
+
+// Create a new board
+app.post('/api/boards', async (req, res) => {
+    const token = getUserFromToken(req);
+    if (!token) {
+        return res.status(401).json({ error: 'Authentication required to create boards' });
+    }
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        const { name, description, is_public, parent_id } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'Board name is required' });
+        }
+
+        const { data, error } = await supabase.from('boards').insert({
+            name: name.trim(),
+            description: description || '',
+            is_public: is_public || false,
+            parent_id: parent_id || null,
+            user_id: user.id
+        }).select().single();
+
+        if (error) throw error;
+
+        return res.json({ success: true, id: data.id, name: data.name });
+    } catch (e) {
+        console.error('Create board error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get single board with images
+app.get('/api/boards/:id', async (req, res) => {
+    try {
+        const boardId = req.params.id;
+
+        // Get board details
+        const { data: board, error: boardError } = await supabase
+            .from('boards')
+            .select('*')
+            .eq('id', boardId)
+            .single();
+
+        if (boardError || !board) {
+            return res.status(404).json({ error: 'Board not found' });
+        }
+
+        // Get board images
+        const { data: boardImages } = await supabase
+            .from('board_images')
+            .select('image_id, position, images(*)')
+            .eq('board_id', boardId)
+            .order('position');
+
+        const images = (boardImages || [])
+            .map(bi => bi.images)
+            .filter(Boolean);
+
+        // Get subfolders
+        const { data: subfolders } = await supabase
+            .from('boards')
+            .select('id, name, is_public')
+            .eq('parent_id', boardId);
+
+        return res.json({
+            board,
+            images,
+            subfolders: subfolders || [],
+            image_count: images.length
+        });
+    } catch (e) {
+        console.error('Get board error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Update board
+app.patch('/api/boards/:id', async (req, res) => {
+    try {
+        const boardId = req.params.id;
+        const { name, description, is_public } = req.body;
+
+        const updates = {};
+        if (name !== undefined) updates.name = name;
+        if (description !== undefined) updates.description = description;
+        if (is_public !== undefined) updates.is_public = is_public;
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ error: 'No updates provided' });
+        }
+
+        const { error } = await supabase
+            .from('boards')
+            .update(updates)
+            .eq('id', boardId);
+
+        if (error) throw error;
+
+        return res.json({ success: true, id: boardId });
+    } catch (e) {
+        console.error('Update board error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Delete board
+app.delete('/api/boards/:id', async (req, res) => {
+    try {
+        const boardId = req.params.id;
+
+        // Delete board (cascade handles board_images)
+        const { error } = await supabase
+            .from('boards')
+            .delete()
+            .eq('id', boardId);
+
+        if (error) throw error;
+
+        return res.json({ success: true, deleted: boardId });
+    } catch (e) {
+        console.error('Delete board error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Add image to board
+app.post('/api/boards/:id/images', async (req, res) => {
+    try {
+        const boardId = req.params.id;
+        const { image_id } = req.body;
+
+        if (!image_id) {
+            return res.status(400).json({ error: 'image_id is required' });
+        }
+
+        // Get current max position
+        const { data: posData } = await supabase
+            .from('board_images')
+            .select('position')
+            .eq('board_id', boardId)
+            .order('position', { ascending: false })
+            .limit(1);
+
+        const maxPos = posData && posData[0] ? posData[0].position : 0;
+
+        // Insert new association
+        const { error } = await supabase.from('board_images').upsert({
+            board_id: boardId,
+            image_id: image_id,
+            position: maxPos + 1
+        });
+
+        if (error) throw error;
+
+        return res.json({ success: true, board_id: boardId, image_id: image_id });
+    } catch (e) {
+        console.error('Add image to board error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Remove image from board
+app.delete('/api/boards/:boardId/images/:imageId', async (req, res) => {
+    try {
+        const { boardId, imageId } = req.params;
+
+        const { error } = await supabase
+            .from('board_images')
+            .delete()
+            .eq('board_id', boardId)
+            .eq('image_id', imageId);
+
+        if (error) throw error;
+
+        return res.json({ success: true, removed: true });
+    } catch (e) {
+        console.error('Remove image from board error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============================================
+// CREDITS API ENDPOINTS
+// ============================================
+
+// Get user credits
+app.get('/api/credits', async (req, res) => {
+    const token = getUserFromToken(req);
+
+    if (!token) {
+        // Return defaults for unauthenticated users
+        return res.json({ credits: 5, subscription_tier: 'free' });
+    }
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (!user) {
+            return res.json({ credits: 5, subscription_tier: 'free' });
+        }
+
+        // Get or create user profile
+        const { data: profile, error } = await supabase
+            .from('user_profiles')
+            .select('credits, subscription_tier, preferences')
+            .eq('user_id', user.id)
+            .single();
+
+        if (error && error.code === 'PGRST116') {
+            // Profile doesn't exist, create one
+            const { data: newProfile } = await supabase
+                .from('user_profiles')
+                .insert({ user_id: user.id, credits: 50, subscription_tier: 'free' })
+                .select()
+                .single();
+
+            return res.json({
+                credits: newProfile?.credits || 50,
+                subscription_tier: newProfile?.subscription_tier || 'free',
+                preferences: newProfile?.preferences || {}
+            });
+        }
+
+        return res.json({
+            credits: profile?.credits ?? 50,
+            subscription_tier: profile?.subscription_tier || 'free',
+            preferences: profile?.preferences || {}
+        });
+    } catch (e) {
+        console.error('Get credits error:', e);
+        res.status(500).json({ error: e.message, credits: 0, subscription_tier: 'free' });
+    }
+});
+
+// Get user profile
+app.get('/api/me', async (req, res) => {
+    const token = getUserFromToken(req);
+
+    if (!token) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        // Get user profile
+        const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+        return res.json({
+            user: {
+                id: user.id,
+                email: user.email,
+                display_name: profile?.display_name || null,
+                credits: profile?.credits ?? 50,
+                subscription_tier: profile?.subscription_tier || 'free'
+            }
+        });
+    } catch (e) {
+        console.error('Get profile error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get images by video
+app.get('/api/images/by-video/:videoId', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('images')
+            .select('*')
+            .eq('video_id', req.params.videoId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return res.json({
+            images: data || [],
+            count: (data || []).length
+        });
+    } catch (e) {
+        console.error('Get images by video error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Root
 app.get('/', (req, res) => {
     res.send('MoodBoard Backend (Node.js) is running');
