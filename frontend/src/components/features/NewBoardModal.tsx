@@ -38,17 +38,27 @@ export function NewBoardModal({
 
         setIsLoading(true);
         try {
+            // Check if user is logged in first
+            const { api } = await import("@/lib/api");
+            const isLoggedIn = await api.isAuthenticated();
+
+            if (!isLoggedIn) {
+                alert("Please log in to create a board. Click the Login button in the top right corner.");
+                setIsLoading(false);
+                return;
+            }
+
             // Call API to create board
-            const result = await import("@/lib/api").then(m => m.api.createBoard({
+            const result = await api.createBoard({
                 name,
                 description,
                 is_public: isPublic
-            }));
+            });
 
             if (result.data?.success && result.data.id) {
                 // If we need to save an image immediately
                 if (imageIdToSave) {
-                    await import("@/lib/api").then(m => m.api.addToBoard(result.data!.id, imageIdToSave));
+                    await api.addToBoard(result.data!.id, imageIdToSave);
                 }
 
                 onBoardCreated?.({ name: result.data.name, description: description });
@@ -56,11 +66,12 @@ export function NewBoardModal({
                 setName("");
                 setDescription("");
             } else {
-                alert(result.error || "Failed to create board");
+                console.error("Board creation error:", result.error);
+                alert(result.error || "Failed to create board. Please try again.");
             }
         } catch (error) {
-            console.error(error);
-            alert("An unexpected error occurred");
+            console.error("Board creation exception:", error);
+            alert("An unexpected error occurred. Please check the console for details.");
         } finally {
             setIsLoading(false);
         }
