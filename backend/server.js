@@ -1,7 +1,7 @@
 
 const express = require('express');
 const cors = require('cors');
-const { getPublicImages, supabase, getImage } = require('./services/supabase');
+const { getPublicImages, supabase, supabaseAdmin, getImage } = require('./services/supabase');
 const { extractConceptsWithAi } = require('./services/straico');
 const { extractConcepts, generateBoardName } = require('./utils/concepts');
 const { generateEmbedding } = require('./services/embeddings');
@@ -658,7 +658,7 @@ app.post('/api/boards', async (req, res) => {
             return res.status(400).json({ error: 'Board name is required' });
         }
 
-        const { data, error } = await supabase.from('boards').insert({
+        const { data, error } = await supabaseAdmin.from('boards').insert({
             name: name.trim(),
             description: description || '',
             is_public: is_public || false,
