@@ -164,6 +164,39 @@ const startVideoProcessing = (videoUrl, qualityMode = 'medium', userId = null) =
 
 const getJobStatus = (jobId) => jobs[jobId];
 
+// Supabase URL and key for Edge Function calls
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://omfxqultpjhvfljgzyxl.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY; // Uses anon key from .env
+
+// Trigger AI analysis for a single image (async, non-blocking)
+const triggerImageAnalysis = async (imageId, imageUrl) => {
+    if (!SUPABASE_ANON_KEY) {
+        console.log(`[Video] Skipping AI analysis for image ${imageId} - no SUPABASE_ANON_KEY`);
+        return;
+    }
+
+    try {
+        console.log(`[Video] Triggering AI analysis for image ${imageId}...`);
+        const response = await axios.post(
+            `${SUPABASE_URL}/functions/v1/analyze-image`,
+            {
+                image_id: imageId,
+                image_url: imageUrl
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 120000 // 2 min timeout for AI processing
+            }
+        );
+        console.log(`[Video] AI analysis complete for image ${imageId}:`, response.data?.success ? 'SUCCESS' : 'PARTIAL');
+    } catch (error) {
+        console.error(`[Video] AI analysis failed for image ${imageId}:`, error.message);
+    }
+};
+
 const uploadApprovedFramesToDb = async (jobId, approvedUrls, videoUrl, options = {}) => {
     try {
         const job = jobs[jobId] || {};
@@ -199,6 +232,18 @@ const uploadApprovedFramesToDb = async (jobId, approvedUrls, videoUrl, options =
                 }).eq('id', videoId);
             }
 
+            // ============================================
+            // TRIGGER AI ANALYSIS FOR EACH FRAME (async, non-blocking)
+            // This runs in the background - don't await completion
+            // ============================================
+            console.log(`[Video] Triggering AI analysis for ${data.length} frames...`);
+            data.forEach(image => {
+                // Fire and forget - don't block the response
+                triggerImageAnalysis(image.id, image.image_url).catch(err => {
+                    console.error(`[Video] Background AI analysis error for ${image.id}:`, err.message);
+                });
+            });
+
             // If public, track contribution for credit rewards
             // For every 10 public images, user earns 1 free credit
             if (isPublic && userId && data.length > 0) {
@@ -233,7 +278,8 @@ const uploadApprovedFramesToDb = async (jobId, approvedUrls, videoUrl, options =
                 count: data.length,
                 video_id: videoId,
                 is_public: isPublic,
-                folder_id: folderId
+                folder_id: folderId,
+                ai_analysis: 'pending' // Indicate AI analysis was triggered
             };
         }
         return { success: true, count: 0 };
