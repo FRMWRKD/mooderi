@@ -118,7 +118,7 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
                             } else if (result.data?.status === "completed") {
                                 return { ...j, status: "completed", progress: 100, stage: "Complete!" };
                             } else if (result.data?.status === "failed") {
-                                return { ...j, status: "failed", error: (result.data as { stage?: string })?.stage || "Processing failed" };
+                                return { ...j, status: "failed", error: result.data.message || "Processing failed" };
                             } else if (result.data?.status === "processing" && j.status === "queued") {
                                 // Start processing - initialize stage
                                 return { ...j, status: "processing", stageIndex: 0, stage: PROCESSING_STAGES[0].name };

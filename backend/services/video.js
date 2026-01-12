@@ -217,7 +217,7 @@ const getJobStatus = async (jobId) => {
                     : video.status === 'pending_approval'
                         ? 'Ready for review!'
                         : video.status === 'failed'
-                            ? 'Processing failed'
+                            ? (video.metadata?.error || 'Processing failed')
                             : 'Processing...',
                 video_id: video.id,
                 video_url: video.url,
