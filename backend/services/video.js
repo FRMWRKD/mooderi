@@ -84,6 +84,17 @@ const processWithModal = async (jobId, videoUrl, qualityMode) => {
             jobs[jobId].message = `Ready for approval (${result.selected_frames.length} frames selected)`;
             jobs[jobId].selected_frames = result.selected_frames || [];
             jobs[jobId].rejected_frames = result.rejected_frames || [];
+
+            // PERSIST TO DB to survive server restarts
+            if (jobs[jobId].video_id) {
+                await supabaseAdmin.from('videos').update({
+                    status: 'pending_approval',
+                    metadata: {
+                        selected_frames: result.selected_frames || [],
+                        rejected_frames: result.rejected_frames || []
+                    }
+                }).eq('id', jobs[jobId].video_id);
+            }
         } else {
             jobs[jobId].status = 'completed';
             jobs[jobId].progress = 100;
@@ -173,24 +184,30 @@ const getJobStatus = async (jobId) => {
     try {
         const { data: video } = await supabaseAdmin
             .from('videos')
-            .select('id, status, frame_count, url, title')
+            .select('id, status, frame_count, url, title, metadata')
             .eq('id', jobId)
             .single();
 
         if (video) {
             console.log(`[Video] Job ${jobId} found in database with status: ${video.status}`);
+
+            // Reconstruct job object from DB
             return {
                 status: video.status,
-                progress: video.status === 'completed' ? 100 :
+                progress: video.status === 'completed' || video.status === 'pending_approval' ? 100 :
                     video.status === 'failed' ? 0 : 50,
                 message: video.status === 'completed'
                     ? `Completed with ${video.frame_count} frames`
-                    : video.status === 'failed'
-                        ? 'Processing failed'
-                        : 'Processing...',
+                    : video.status === 'pending_approval'
+                        ? 'Ready for review!'
+                        : video.status === 'failed'
+                            ? 'Processing failed'
+                            : 'Processing...',
                 video_id: video.id,
                 video_url: video.url,
-                title: video.title
+                title: video.title,
+                selected_frames: video.metadata?.selected_frames || [],
+                rejected_frames: video.metadata?.rejected_frames || []
             };
         }
     } catch (e) {
