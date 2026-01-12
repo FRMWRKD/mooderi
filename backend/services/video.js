@@ -98,14 +98,30 @@ const processWithModal = async (jobId, videoUrl, qualityMode) => {
         } else {
             jobs[jobId].status = 'completed';
             jobs[jobId].progress = 100;
-            jobs[jobId].message = 'Processing complete';
-            jobs[jobId].result = result;
+            jobs[jobId].message = 'Completed';
+            jobs[jobId].frame_count = result.frames ? result.frames.length : 0;
+
+            // PERSIST COMPLETED STATE
+            if (jobs[jobId].video_id) {
+                await supabaseAdmin.from('videos').update({
+                    status: 'completed',
+                    frame_count: jobs[jobId].frame_count
+                }).eq('id', jobs[jobId].video_id);
+            }
         }
 
     } catch (error) {
         console.error(`[Job ${jobId}] Failed:`, error.message);
         jobs[jobId].status = 'failed';
         jobs[jobId].message = error.message;
+
+        // PERSIST FAILED STATE
+        if (jobs[jobId].video_id) {
+            await supabaseAdmin.from('videos').update({
+                status: 'failed',
+                metadata: { error: error.message }
+            }).eq('id', jobs[jobId].video_id);
+        }
     }
 };
 
