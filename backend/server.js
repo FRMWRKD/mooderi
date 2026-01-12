@@ -620,7 +620,7 @@ app.get('/api/boards', async (req, res) => {
             }
         }
 
-        let query = supabase.from('boards').select('*');
+        let query = supabaseAdmin.from('boards').select('*');
 
         if (userId) {
             query = query.eq('user_id', userId);
@@ -790,7 +790,7 @@ app.post('/api/boards/:id/images', async (req, res) => {
         const maxPos = posData && posData[0] ? posData[0].position : 0;
 
         // Insert new association
-        const { error } = await supabase.from('board_images').upsert({
+        const { error } = await supabaseAdmin.from('board_images').upsert({
             board_id: boardId,
             image_id: image_id,
             position: maxPos + 1
