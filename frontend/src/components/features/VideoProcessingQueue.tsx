@@ -104,10 +104,7 @@ export function VideoProcessingQueue() {
         j.status === "completed" || j.status === "pending_approval"
     ).length;
 
-    // Don't render if no jobs and not adding
-    if (jobs.length === 0 && !showAddForm) {
-        return null;
-    }
+    // Always show at least a minimal Add Video button (removed the return null condition)
 
     return (
         <div className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${isMinimized ? "w-auto" : "w-96"
