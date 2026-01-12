@@ -22,6 +22,38 @@ export function VideoProcessingQueue() {
     const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
     const [pendingFrames, setPendingFrames] = useState<string[]>([]);
     const [pendingVideoUrl, setPendingVideoUrl] = useState("");
+    const [autoOpenedJobs, setAutoOpenedJobs] = useState<Set<string>>(new Set());
+
+    // AUTO-OPEN modal when job reaches pending_approval
+    useEffect(() => {
+        const pendingJob = jobs.find(j =>
+            j.status === "pending_approval" &&
+            !autoOpenedJobs.has(j.id) &&
+            !showFrameModal
+        );
+
+        if (pendingJob) {
+            console.log("[VideoQueue] Auto-opening frame modal for job:", pendingJob.id);
+            // Mark as auto-opened to prevent reopening
+            setAutoOpenedJobs(prev => new Set([...prev, pendingJob.id]));
+            // Trigger review click
+            (async () => {
+                try {
+                    const framesResult = await api.getVideoFrames(pendingJob.id);
+                    const frames = framesResult.data?.selected_frames || framesResult.data?.frames;
+                    if (frames && frames.length > 0) {
+                        const frameUrls = frames.map((f: { url?: string; image_url?: string }) => f.url || f.image_url || "");
+                        setPendingFrames(frameUrls.filter(Boolean));
+                        setPendingVideoUrl(pendingJob.url);
+                        setSelectedJobId(pendingJob.id);
+                        setShowFrameModal(true);
+                    }
+                } catch (e) {
+                    console.error("Auto-open failed:", e);
+                }
+            })();
+        }
+    }, [jobs, autoOpenedJobs, showFrameModal]);
 
     const handleReviewClick = async (job: VideoJob) => {
         if (job.status !== "pending_approval") return;
