@@ -20,7 +20,7 @@ import {
     DropdownItem,
     DropdownSeparator,
 } from "@/components/ui/Dropdown";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -128,6 +128,14 @@ export function TopBar() {
             });
         }
     }, [user]);
+
+    // Refresh credits after actions like frame approval
+    const refreshCredits = useCallback(async () => {
+        const result = await api.getCredits();
+        if (result.data) {
+            setCredits(result.data.credits);
+        }
+    }, []);
 
     const handleStartAnalysis = async () => {
         if (!videoUrl.trim()) {
@@ -430,6 +438,7 @@ export function TopBar() {
                 videoUrl={pendingVideoUrl}
                 onComplete={() => {
                     setPendingFrames([]);
+                    refreshCredits(); // Refresh credits after frame approval
                     router.push("/videos");
                 }}
             />

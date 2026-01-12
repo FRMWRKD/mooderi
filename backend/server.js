@@ -471,14 +471,14 @@ app.post('/api/process-video', async (req, res) => {
     return res.json({ job_id: jobId, status: 'queued', quality_mode: qualityMode });
 });
 
-app.get('/api/process-video/status/:jobId', (req, res) => {
-    const job = getJobStatus(req.params.jobId);
+app.get('/api/process-video/status/:jobId', async (req, res) => {
+    const job = await getJobStatus(req.params.jobId);
     if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
 });
 
-app.get('/api/process-video/frames/:jobId', (req, res) => {
-    const job = getJobStatus(req.params.jobId);
+app.get('/api/process-video/frames/:jobId', async (req, res) => {
+    const job = await getJobStatus(req.params.jobId);
     if (!job) return res.status(404).json({ error: 'Job not found' });
 
     if (job.status !== 'pending_approval') {
@@ -501,6 +501,34 @@ app.post('/api/process-video/approve', async (req, res) => {
     if (result.error) return res.status(500).json(result);
 
     return res.json(result);
+});
+
+// Admin: Reset stuck processing videos
+app.post('/api/admin/cleanup-stuck-videos', async (req, res) => {
+    try {
+        // Find videos stuck in 'processing' for more than 30 minutes
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+        const { data, error } = await supabaseAdmin
+            .from('videos')
+            .update({ status: 'failed' })
+            .eq('status', 'processing')
+            .lt('created_at', thirtyMinutesAgo)
+            .select();
+
+        if (error) throw error;
+
+        console.log(`[Admin] Cleaned up ${data?.length || 0} stuck videos`);
+
+        return res.json({
+            success: true,
+            cleaned_count: data?.length || 0,
+            videos: data
+        });
+    } catch (e) {
+        console.error('Cleanup error:', e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // Single Image API

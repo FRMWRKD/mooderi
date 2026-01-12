@@ -162,7 +162,44 @@ const startVideoProcessing = (videoUrl, qualityMode = 'medium', userId = null) =
     return jobId;
 };
 
-const getJobStatus = (jobId) => jobs[jobId];
+const getJobStatus = async (jobId) => {
+    // Check in-memory store first
+    if (jobs[jobId]) {
+        return jobs[jobId];
+    }
+
+    // Fallback: Check database for video record
+    // This handles cases where server restarted and lost in-memory state
+    try {
+        const { data: video } = await supabaseAdmin
+            .from('videos')
+            .select('id, status, frame_count, url, title')
+            .eq('id', jobId)
+            .single();
+
+        if (video) {
+            console.log(`[Video] Job ${jobId} found in database with status: ${video.status}`);
+            return {
+                status: video.status,
+                progress: video.status === 'completed' ? 100 :
+                    video.status === 'failed' ? 0 : 50,
+                message: video.status === 'completed'
+                    ? `Completed with ${video.frame_count} frames`
+                    : video.status === 'failed'
+                        ? 'Processing failed'
+                        : 'Processing...',
+                video_id: video.id,
+                video_url: video.url,
+                title: video.title
+            };
+        }
+    } catch (e) {
+        // Video not found by this ID - could be a UUID job ID, not a video ID
+        console.log(`[Video] Job ${jobId} not found in database`);
+    }
+
+    return null;
+};
 
 // Supabase URL and key for Edge Function calls
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://omfxqultpjhvfljgzyxl.supabase.co';
