@@ -845,7 +845,7 @@ app.get('/api/credits', async (req, res) => {
         }
 
         // Get or create user profile
-        const { data: profile, error } = await supabase
+        const { data: profile, error } = await supabaseAdmin
             .from('user_profiles')
             .select('credits, subscription_tier, preferences')
             .eq('user_id', user.id)
@@ -853,7 +853,7 @@ app.get('/api/credits', async (req, res) => {
 
         if (error && error.code === 'PGRST116') {
             // Profile doesn't exist, create one
-            const { data: newProfile } = await supabase
+            const { data: newProfile } = await supabaseAdmin
                 .from('user_profiles')
                 .insert({ user_id: user.id, credits: 50, subscription_tier: 'free' })
                 .select()
@@ -892,7 +892,7 @@ app.get('/api/me', async (req, res) => {
         }
 
         // Get user profile
-        const { data: profile } = await supabase
+        const { data: profile } = await supabaseAdmin
             .from('user_profiles')
             .select('*')
             .eq('user_id', user.id)
