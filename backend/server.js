@@ -494,10 +494,13 @@ app.get('/api/process-video/frames/:jobId', async (req, res) => {
 });
 
 app.post('/api/process-video/approve', async (req, res) => {
-    const { job_id, approved_urls, video_url } = req.body;
+    const { job_id, approved_urls, video_url, is_public, folder_id } = req.body;
     if (!job_id || !approved_urls) return res.status(400).json({ error: 'job_id and approved_urls required' });
 
-    const result = await uploadApprovedFramesToDb(job_id, approved_urls, video_url);
+    const result = await uploadApprovedFramesToDb(job_id, approved_urls, video_url, {
+        isPublic: is_public !== false,  // Default to true
+        folderId: folder_id || null
+    });
     if (result.error) return res.status(500).json(result);
 
     return res.json(result);
