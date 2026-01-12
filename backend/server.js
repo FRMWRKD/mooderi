@@ -681,7 +681,7 @@ app.get('/api/boards/:id', async (req, res) => {
         const boardId = req.params.id;
 
         // Get board details
-        const { data: board, error: boardError } = await supabase
+        const { data: board, error: boardError } = await supabaseAdmin
             .from('boards')
             .select('*')
             .eq('id', boardId)
@@ -692,7 +692,7 @@ app.get('/api/boards/:id', async (req, res) => {
         }
 
         // Get board images
-        const { data: boardImages } = await supabase
+        const { data: boardImages } = await supabaseAdmin
             .from('board_images')
             .select('image_id, position, images(*)')
             .eq('board_id', boardId)
@@ -703,7 +703,7 @@ app.get('/api/boards/:id', async (req, res) => {
             .filter(Boolean);
 
         // Get subfolders
-        const { data: subfolders } = await supabase
+        const { data: subfolders } = await supabaseAdmin
             .from('boards')
             .select('id, name, is_public')
             .eq('parent_id', boardId);
@@ -735,7 +735,7 @@ app.patch('/api/boards/:id', async (req, res) => {
             return res.status(400).json({ error: 'No updates provided' });
         }
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from('boards')
             .update(updates)
             .eq('id', boardId);
@@ -755,7 +755,7 @@ app.delete('/api/boards/:id', async (req, res) => {
         const boardId = req.params.id;
 
         // Delete board (cascade handles board_images)
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from('boards')
             .delete()
             .eq('id', boardId);
@@ -780,7 +780,7 @@ app.post('/api/boards/:id/images', async (req, res) => {
         }
 
         // Get current max position
-        const { data: posData } = await supabase
+        const { data: posData } = await supabaseAdmin
             .from('board_images')
             .select('position')
             .eq('board_id', boardId)
@@ -810,7 +810,7 @@ app.delete('/api/boards/:boardId/images/:imageId', async (req, res) => {
     try {
         const { boardId, imageId } = req.params;
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
             .from('board_images')
             .delete()
             .eq('board_id', boardId)
