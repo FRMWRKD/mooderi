@@ -155,7 +155,8 @@ const startVideoProcessing = (videoUrl, qualityMode = 'medium', userId = null) =
                 quality_mode: qualityMode,
                 status: 'processing',
                 is_public: true,
-                user_id: userId
+                user_id: userId,
+                job_id: jobId  // Store the job_id for lookup
             }).select().single();
 
             if (data) {
@@ -195,13 +196,13 @@ const getJobStatus = async (jobId) => {
         return jobs[jobId];
     }
 
-    // Fallback: Check database for video record
+    // Fallback: Check database for video record by job_id
     // This handles cases where server restarted and lost in-memory state
     try {
         const { data: video } = await supabaseAdmin
             .from('videos')
-            .select('id, status, frame_count, url, title, metadata')
-            .eq('id', jobId)
+            .select('id, status, frame_count, url, title, metadata, job_id')
+            .eq('job_id', jobId)
             .single();
 
         if (video) {

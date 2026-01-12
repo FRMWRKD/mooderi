@@ -2,7 +2,7 @@
 const axios = require('axios');
 
 const BACKEND_URL = "https://mooderi-u26413.vm.elestio.app";
-const VIDEO_URL = "https://www.youtube.com/watch?v=b0Ezn5pZE7o";
+const VIDEO_URL = "https://www.instagram.com/reel/DSzfpanAbCy/?utm_source=ig_web_copy_link&igsh=NTc4MTIwNjQ2YQ==";
 
 async function runTest() {
     console.log(`1. Starting Video Analysis for ${VIDEO_URL}...`);
