@@ -85,10 +85,25 @@ const processWithModal = async (jobId, videoUrl, qualityMode) => {
             jobs[jobId].selected_frames = result.selected_frames || [];
             jobs[jobId].rejected_frames = result.rejected_frames || [];
 
+            // Use first selected frame as thumbnail for non-YouTube videos (Instagram, TikTok, etc.)
+            const firstFrameUrl = result.selected_frames?.[0]?.url;
+            if (firstFrameUrl && jobs[jobId].video_id) {
+                const platform = getVideoPlatform(videoUrl);
+                // Only update if not already set (e.g., YouTube already has thumbnail)
+                if (platform !== 'youtube') {
+                    await supabaseAdmin.from('videos').update({
+                        thumbnail_url: firstFrameUrl
+                    }).eq('id', jobs[jobId].video_id);
+                    jobs[jobId].thumbnail_url = firstFrameUrl;
+                    console.log(`[Job ${jobId}] Set thumbnail for ${platform}: ${firstFrameUrl}`);
+                }
+            }
+
             // PERSIST TO DB to survive server restarts
             if (jobs[jobId].video_id) {
                 await supabaseAdmin.from('videos').update({
                     status: 'pending_approval',
+                    thumbnail_url: jobs[jobId].thumbnail_url || null,
                     metadata: {
                         selected_frames: result.selected_frames || [],
                         rejected_frames: result.rejected_frames || []

@@ -105,36 +105,45 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
         if (activeJobs.length === 0) return;
 
         const interval = setInterval(async () => {
-            for (const job of activeJobs) {
-                try {
-                    const result = await api.getVideoStatus(job.id);
-                    if (result.data) {
-                        setJobs(prev => prev.map(j => {
-                            if (j.id !== job.id) return j;
-
-                            // If backend reports a terminal state, use it
-                            if (result.data?.status === "pending_approval") {
-                                return { ...j, status: "pending_approval", progress: 100, stage: "Ready for review!" };
-                            } else if (result.data?.status === "completed") {
-                                return { ...j, status: "completed", progress: 100, stage: "Complete!" };
-                            } else if (result.data?.status === "failed") {
-                                return { ...j, status: "failed", error: result.data.message || "Processing failed" };
-                            } else if (result.data?.status === "processing" && j.status === "queued") {
-                                // Start processing - initialize stage
-                                return { ...j, status: "processing", stageIndex: 0, stage: PROCESSING_STAGES[0].name };
-                            }
-
-                            return j;
-                        }));
+            // Fetch all statuses in parallel to avoid race conditions
+            const statusUpdates = await Promise.all(
+                activeJobs.map(async (job) => {
+                    try {
+                        const result = await api.getVideoStatus(job.id);
+                        return { jobId: job.id, data: result.data, error: null };
+                    } catch (e) {
+                        console.error("Polling error for job", job.id, e);
+                        return { jobId: job.id, data: null, error: e };
                     }
-                } catch (e) {
-                    console.error("Polling error for job", job.id, e);
+                })
+            );
+
+            // Apply all updates in a single setState call
+            setJobs(prev => prev.map(j => {
+                const update = statusUpdates.find(u => u.jobId === j.id);
+                if (!update?.data) return j;
+
+                const status = update.data.status;
+
+                // If backend reports a terminal state, use it
+                if (status === "pending_approval") {
+                    return { ...j, status: "pending_approval", progress: 100, stage: "Ready for review!" };
+                } else if (status === "completed") {
+                    return { ...j, status: "completed", progress: 100, stage: "Complete!" };
+                } else if (status === "failed") {
+                    return { ...j, status: "failed", error: update.data.message || "Processing failed" };
+                } else if (status === "processing" && j.status === "queued") {
+                    // Start processing - initialize stage
+                    return { ...j, status: "processing", stageIndex: 0, stage: PROCESSING_STAGES[0].name };
                 }
-            }
+
+                return j;
+            }));
         }, 3000);
 
         return () => clearInterval(interval);
     }, [jobs]);
+
 
     const addJob = useCallback((jobId: string, url: string) => {
         const title = extractVideoTitle(url);

@@ -35,7 +35,7 @@ export function VideoProcessingQueue() {
         if (pendingJob) {
             console.log("[VideoQueue] Auto-opening frame modal for job:", pendingJob.id);
             // Mark as auto-opened to prevent reopening
-            setAutoOpenedJobs(prev => new Set([...prev, pendingJob.id]));
+            setAutoOpenedJobs(prev => new Set([...Array.from(prev), pendingJob.id]));
             // Trigger review click
             (async () => {
                 try {

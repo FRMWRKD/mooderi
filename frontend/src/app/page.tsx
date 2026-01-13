@@ -399,7 +399,7 @@ export default function HomePage() {
                 {images.length > 0 && viewMode !== "videos" && (
                     <div className={
                         viewMode === "grid"
-                            ? "columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-5"
+                            ? "columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 2xl:columns-7 gap-4"
                             : "flex flex-col gap-4"
                     }>
                         {images.map((image) => (

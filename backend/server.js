@@ -156,11 +156,36 @@ app.get('/api/images/filter', async (req, res) => {
         const sort = req.query.sort || 'ranked';
         const limit = Math.min(parseInt(req.query.limit || 50), 100);
         const offset = parseInt(req.query.offset || 0);
+        const myImages = req.query.my_images === 'true';
 
-        let query = supabase
+        let query = supabaseAdmin
             .from('images')
-            .select('id, image_url, prompt, mood, lighting, colors, tags, aesthetic_score, likes, dislikes, generated_prompts, source_video_url, is_public')
-            .eq('is_public', true);
+            .select('id, image_url, prompt, mood, lighting, colors, tags, aesthetic_score, likes, dislikes, generated_prompts, source_video_url, is_public, user_id, created_at');
+
+        // If my_images is true, show authenticated user's own images
+        if (myImages) {
+            const token = getUserFromToken(req);
+            if (token) {
+                try {
+                    const { data: { user } } = await supabase.auth.getUser(token);
+                    if (user) {
+                        query = query.eq('user_id', user.id);
+                    } else {
+                        // Not authenticated, fall back to public
+                        query = query.eq('is_public', true);
+                    }
+                } catch (e) {
+                    console.log('Auth failed, showing public images');
+                    query = query.eq('is_public', true);
+                }
+            } else {
+                // No token, show public images
+                query = query.eq('is_public', true);
+            }
+        } else {
+            // Default: only public images
+            query = query.eq('is_public', true);
+        }
 
         // Apply filters
         if (moods.length > 0) {
@@ -204,6 +229,7 @@ app.get('/api/images/filter', async (req, res) => {
         res.status(500).json({ error: e.message, images: [], count: 0, has_more: false });
     }
 });
+
 
 // Notifications endpoint
 app.get('/api/notifications', async (req, res) => {
@@ -549,24 +575,36 @@ app.get('/api/image/:id/similar', async (req, res) => {
     // Actually, `match_images` RPC is available in Supabase, so let's do it properly if easy.
     // But for Speed, I'll return empty for now and let the frontend handle it gracefully or do basic tag search.
 
-    // Quick and dirty tag search fallback:
+    // Quick and dirty tag search fallback with pagination:
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 12;
+        const from = (page - 1) * limit;
+        const to = from + limit; // Fetch one extra to check for has_more
+
         const image = await getImage(req.params.id);
         if (!image) return res.status(404).json({ error: "Not found" });
 
-        // Use tags to find similar
+        let query = supabase.from('images').select('*');
+
+        // Use tags to find similar if available
         if (image.tags && image.tags.length > 0) {
-            const { data } = await supabase.from('images')
-                .select('*')
-                .contains('tags', image.tags.slice(0, 2)) // First 2 tags
-                .neq('id', image.id)
-                .limit(12);
-            return res.json({ images: data || [], has_more: false });
+            query = query.contains('tags', image.tags.slice(0, 2)); // First 2 tags
         }
 
-        // Fallback to recent
-        const { data } = await supabase.from('images').select('*').neq('id', image.id).limit(12);
-        return res.json({ images: data || [], has_more: false });
+        // Apply exclusion and pagination
+        // Note: range is inclusive in Supabase, so to matches index
+        const { data, error } = await query
+            .neq('id', image.id)
+            .order('created_at', { ascending: false })
+            .range(from, to);
+
+        if (error) throw error;
+
+        const hasMore = data.length > limit;
+        const images = hasMore ? data.slice(0, limit) : data;
+
+        return res.json({ images: images || [], has_more: hasMore });
 
     } catch (e) {
         return res.status(500).json({ error: e.message });

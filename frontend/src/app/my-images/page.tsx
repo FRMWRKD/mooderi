@@ -48,9 +48,11 @@ export default function MyImagesPage() {
             source_type?: string;
             limit: number;
             sort: string;
+            my_images: boolean;
         } = {
             limit: 100,
             sort: sortBy === "oldest" ? "oldest" : "newest",
+            my_images: true,  // Show user's own images
         };
 
         // Apply source filter
@@ -59,6 +61,7 @@ export default function MyImagesPage() {
         }
 
         const result = await api.getFilteredImages(params);
+
 
         if (result.data) {
             let sortedImages = result.data.images || [];
@@ -163,7 +166,7 @@ export default function MyImagesPage() {
                                 <ChevronDown className="w-4 h-4 text-text-tertiary" />
                             </button>
                             {showSortMenu && (
-                                <div className="absolute right-0 top-full mt-1 w-44 bg-surface-elevated border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                                <div className="absolute right-0 top-full mt-1 w-44 bg-black border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden">
                                     {SORT_OPTIONS.map(option => (
                                         <button
                                             key={option.value}
@@ -172,7 +175,7 @@ export default function MyImagesPage() {
                                                 setSortBy(option.value);
                                                 setShowSortMenu(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${sortBy === option.value ? "bg-accent-blue/10 text-accent-blue" : ""}`}
+                                            className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${sortBy === option.value ? "bg-white/10 text-accent-blue" : ""}`}
                                         >
                                             {option.label}
                                         </button>
@@ -207,7 +210,7 @@ export default function MyImagesPage() {
                                 <ChevronDown className="w-4 h-4 text-text-tertiary" />
                             </button>
                             {showFilterMenu && (
-                                <div className="absolute right-0 top-full mt-1 w-44 bg-surface-elevated border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+                                <div className="absolute right-0 top-full mt-1 w-44 bg-black border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden">
                                     {FILTER_OPTIONS.map(option => (
                                         <button
                                             key={option.value}
@@ -216,7 +219,7 @@ export default function MyImagesPage() {
                                                 setFilterBy(option.value);
                                                 setShowFilterMenu(false);
                                             }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${filterBy === option.value ? "bg-accent-blue/10 text-accent-blue" : ""}`}
+                                            className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${filterBy === option.value ? "bg-white/10 text-accent-blue" : ""}`}
                                         >
                                             {option.label}
                                         </button>

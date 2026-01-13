@@ -275,11 +275,11 @@ export default function ImageDetailPage({
                 <div className="flex gap-8 items-start">
                     {/* Left Column: Main Image */}
                     <div className="flex-1">
-                        <div className="relative">
+                        <div className="relative flex justify-center">
                             <img
                                 src={image.image_url}
                                 alt={image.prompt || "Image"}
-                                className="w-full border border-white/30"
+                                className="max-w-full max-h-[65vh] object-contain border border-white/30"
                             />
                         </div>
                     </div>
@@ -617,7 +617,7 @@ export default function ImageDetailPage({
                     similarImages.length > 0 && (
                         <div className="mt-12">
                             <h2 className="text-xl font-semibold mb-6">More like this</h2>
-                            <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-4">
+                            <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 2xl:columns-7 gap-4">
                                 {similarImages.map((img) => (
                                     <ImageCard
                                         key={img.id}

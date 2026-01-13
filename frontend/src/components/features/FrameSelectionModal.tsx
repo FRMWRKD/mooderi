@@ -101,13 +101,24 @@ export function FrameSelectionModal({
                 isPublic,
                 folderId: selectedFolderId || undefined,
             });
+
+            // Check for API error
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
             const count = result.data?.approved_count || selectedFrames.length;
             setSavedCount(count);
             setShowSuccess(true);
             onComplete();
+
+            // Navigate to My Images after a brief delay so user sees success message
+            setTimeout(() => {
+                router.push("/my-images");
+            }, 1500);
         } catch (e) {
             console.error("Failed to approve frames", e);
-            alert("Failed to save selection");
+            alert("Failed to save selection: " + (e instanceof Error ? e.message : "Unknown error"));
         } finally {
             setIsSubmitting(false);
         }
@@ -190,8 +201,8 @@ export function FrameSelectionModal({
                                         <button
                                             onClick={() => setIsPublic(true)}
                                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border transition-all text-sm ${isPublic
-                                                    ? "bg-green-500/20 border-green-500/50 text-green-400"
-                                                    : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
+                                                ? "bg-green-500/20 border-green-500/50 text-green-400"
+                                                : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
                                                 }`}
                                         >
                                             <Globe className="w-4 h-4" />
@@ -201,8 +212,8 @@ export function FrameSelectionModal({
                                         <button
                                             onClick={() => setIsPublic(false)}
                                             className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border transition-all text-sm ${!isPublic
-                                                    ? "bg-accent-blue/20 border-accent-blue/50 text-accent-blue"
-                                                    : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
+                                                ? "bg-accent-blue/20 border-accent-blue/50 text-accent-blue"
+                                                : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
                                                 }`}
                                         >
                                             <Lock className="w-4 h-4" />
@@ -230,14 +241,14 @@ export function FrameSelectionModal({
                                             <ChevronDown className="w-4 h-4 text-text-tertiary" />
                                         </button>
                                         {showFolderMenu && (
-                                            <div className="absolute left-0 top-full mt-1 w-full bg-surface-elevated border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto">
+                                            <div className="absolute left-0 top-full mt-1 w-full bg-black border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden max-h-48 overflow-y-auto">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setSelectedFolderId(null);
                                                         setShowFolderMenu(false);
                                                     }}
-                                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${!selectedFolderId ? "bg-accent-blue/10 text-accent-blue" : ""}`}
+                                                    className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${!selectedFolderId ? "bg-white/10 text-accent-blue" : ""}`}
                                                 >
                                                     No folder
                                                 </button>
@@ -249,7 +260,7 @@ export function FrameSelectionModal({
                                                             setSelectedFolderId(folder.id);
                                                             setShowFolderMenu(false);
                                                         }}
-                                                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${selectedFolderId === folder.id ? "bg-accent-blue/10 text-accent-blue" : ""}`}
+                                                        className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${selectedFolderId === folder.id ? "bg-white/10 text-accent-blue" : ""}`}
                                                     >
                                                         {folder.name}
                                                     </button>
