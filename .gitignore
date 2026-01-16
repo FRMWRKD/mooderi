@@ -59,3 +59,10 @@ frames/
 *.pem
 *.key
 .vercel
+
+# Mac OS X Resource Forks
+._*
+.DS_Store
+**/.DS_Store
+**/._*
+
