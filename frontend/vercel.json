@@ -5,6 +5,7 @@
     "outputDirectory": ".next",
     "installCommand": "npm install",
     "env": {
+        "NEXT_PUBLIC_CONVEX_URL": "https://hidden-falcon-801.convex.cloud",
         "NEXT_PUBLIC_BACKEND_URL": "https://mooderi-u26413.vm.elestio.app",
         "NEXT_PUBLIC_SUPABASE_URL": "https://omfxqultpjhvfljgzyxl.supabase.co",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tZnhxdWx0cGpodmZsamd6eXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU5NTQxODUsImV4cCI6MjA4MTUzMDE4NX0.D40ENk-v_XQPWMur3MonaVasJY36mR4QctmXTyWNPX4"
