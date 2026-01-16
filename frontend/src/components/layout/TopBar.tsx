@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/Dropdown";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { api } from "@/lib/api";
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useVideoJobs } from "@/contexts/VideoJobContext";
 import { CreditsModal } from "@/components/features/CreditsModal";
@@ -32,6 +33,9 @@ import { SmartBoardModal } from "@/components/features/SmartBoardModal";
 import { NewBoardModal } from "@/components/features/NewBoardModal";
 
 export function TopBar() {
+    // Auth
+    const { user } = useAuth();
+
     // Search state
     const [searchQuery, setSearchQuery] = useState("");
     const [isSemanticSearch, setIsSemanticSearch] = useState(false);
@@ -43,19 +47,22 @@ export function TopBar() {
     const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Credits & notifications
-    const [credits, setCredits] = useState<number>(100);
-    const [unreadCount, setUnreadCount] = useState<number>(0);
-    const [notifications, setNotifications] = useState<Array<{
-        id: string;
-        title: string;
-        message: string;
-        type: string;
-        is_read: boolean;
-        created_at: string;
-    }>>([]);
+    // Convex Data
+    // User data for credits (uses getCurrent which works with Convex Auth)
+    const userData = useQuery(api.users.getCurrent);
+    const credits = userData?.credits ?? 0;
+
+    // Notifications data
+    const notificationsData = useQuery(api.notifications.list, { limit: 20 });
+    const notifications = notificationsData?.notifications ?? [];
+    const unreadCount = notificationsData?.unreadCount ?? 0;
+
+    // Actions & Mutations
+    const markAsRead = useMutation(api.notifications.markAsRead);
+    const createVideo = useMutation(api.videos.create);
+    const analyzeVideo = useAction(api.videos.analyze);
+
     const [showNotifications, setShowNotifications] = useState(false);
-    const { user } = useAuth();
     const { addJob: addVideoJob, hasActiveJobs, activeCount } = useVideoJobs();
     const router = useRouter();
     const pathname = usePathname();
@@ -68,73 +75,38 @@ export function TopBar() {
     const [pendingFrames, setPendingFrames] = useState<string[]>([]);
     const [pendingVideoUrl, setPendingVideoUrl] = useState("");
 
-    // Poll for job status
+    // Reactive Video Status (replaces legacy polling)
+    const activeVideo = useQuery(api.videos.getById, activeJobId ? { id: activeJobId as any } : "skip");
+    const activeFrames = useQuery(api.videos.getFrames, activeJobId ? { videoId: activeJobId as any } : "skip");
+
+    // Monitor video status changes
     useEffect(() => {
-        if (!activeJobId) return;
+        if (!activeVideo) return;
 
-        const interval = setInterval(async () => {
-            try {
-                const result = await api.getVideoStatus(activeJobId);
-                console.log("Job status:", result.data?.status);
-
-                if (result.data) {
-                    if (result.data.status === "pending_approval") {
-                        // Ready for frame selection
-                        const framesResult = await api.getVideoFrames(activeJobId);
-                        if (framesResult.data && framesResult.data.frames) {
-                            // Map Image objects to URL strings
-                            const frameUrls = framesResult.data.frames.map(f => f.image_url);
-                            // Get video source URL from first frame if available
-                            const videoSource = framesResult.data.frames[0]?.source_video_url || "";
-
-                            setPendingFrames(frameUrls);
-                            setPendingVideoUrl(videoSource);
-                            setPendingJobId(activeJobId);
-                            setShowFrameSelection(true);
-                            setActiveJobId(null); // Stop polling
-                        }
-                    } else if (result.data.status === "failed") {
-                        // Type assertion to bypass potential type mismatch if message is not in definition
-                        const errorMessage = (result.data as any).message || "Unknown error";
-                        setError("Analysis failed: " + errorMessage);
-                        setActiveJobId(null);
-                        setIsVideoModalOpen(true); // Re-open input modal to show error
-                    } else if (result.data.status === "completed") {
-                        setActiveJobId(null);
-                        router.push("/videos");
-                    }
-                }
-            } catch (e) {
-                console.error("Polling error", e);
-            }
-        }, 2000);
-
-        return () => clearInterval(interval);
-    }, [activeJobId, router]);
-
-
-    useEffect(() => {
-        if (user) {
-            api.getCredits().then(result => {
-                if (result.data) {
-                    setCredits(result.data.credits);
-                }
-            });
-            api.getNotifications().then(result => {
-                if (result.data) {
-                    setNotifications(result.data.notifications);
-                    setUnreadCount(result.data.unread_count);
-                }
-            });
+        if (activeVideo.status === "pending_approval" && activeFrames && activeFrames.length > 0) {
+            // Ready for frame selection
+            const frameUrls = activeFrames.map(f => f.imageUrl);
+            setPendingFrames(frameUrls);
+            setPendingVideoUrl(activeVideo.url);
+            setPendingJobId(activeVideo._id);
+            setShowFrameSelection(true);
+            setActiveJobId(null); // Stop monitoring
+            setIsAnalyzing(false);
+        } else if (activeVideo.status === "failed") {
+            setError("Analysis failed: " + ((activeVideo as any).errorMessage || "Unknown error"));
+            setActiveJobId(null);
+            setIsAnalyzing(false);
+            setIsVideoModalOpen(true);
+        } else if (activeVideo.status === "completed") {
+            setActiveJobId(null);
+            setIsAnalyzing(false);
+            router.push("/videos");
         }
-    }, [user]);
+    }, [activeVideo, activeFrames, router]);
 
-    // Refresh credits after actions like frame approval
+    // Refresh credits helper (mostly redundant with reactive Update but kept for manual triggers)
     const refreshCredits = useCallback(async () => {
-        const result = await api.getCredits();
-        if (result.data) {
-            setCredits(result.data.credits);
-        }
+        // No-op in Convex as useQuery updates automatically
     }, []);
 
     const handleStartAnalysis = async () => {
@@ -147,20 +119,37 @@ export function TopBar() {
         setIsAnalyzing(true);
 
         try {
-            const result = await api.analyzeVideo(videoUrl, quality);
-            if (result.data?.job_id) {
-                setActiveJobId(result.data.job_id);
-                addVideoJob(result.data.job_id, videoUrl); // Add to shared context
-                setIsVideoModalOpen(false); // Close input modal
-                setVideoUrl("");
-                console.log("Started analysis, polling job:", result.data.job_id);
-            } else {
-                setError(result.error || "Failed to start analysis");
+            // 1. Create entry in Convex
+            const result = await createVideo({
+                url: videoUrl,
+                qualityMode: quality,
+                title: "New Video"
+            });
+
+            if (!result.success || !result.id) {
+                throw new Error("Failed to create video entry");
             }
+
+            const videoId = result.id;
+            setActiveJobId(videoId);
+            addVideoJob(videoId, videoUrl); // Add to shared context
+
+            // 2. Trigger Modal Analysis
+            await analyzeVideo({
+                videoId: videoId,
+                videoUrl,
+                qualityMode: quality
+            });
+
+            setIsVideoModalOpen(false); // Close input modal
+            setVideoUrl("");
+            console.log("Started analysis:", videoId);
+
         } catch (e) {
-            setError("An unexpected error occurred");
-        } finally {
+            console.error("Analysis start error:", e);
+            setError("Failed to start analysis: " + (e instanceof Error ? e.message : "Unknown error"));
             setIsAnalyzing(false);
+            setActiveJobId(null);
         }
     };
 
@@ -254,9 +243,8 @@ export function TopBar() {
                                     {unreadCount > 0 && (
                                         <button
                                             onClick={() => {
-                                                api.markNotificationsRead();
-                                                setUnreadCount(0);
-                                                setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+                                                markAsRead({}); // Mark all as read
+                                                setShowNotifications(false);
                                             }}
                                             className="text-xs text-white/60 hover:text-white underline"
                                         >
@@ -272,19 +260,17 @@ export function TopBar() {
                                     ) : (
                                         notifications.slice(0, 10).map((n) => (
                                             <div
-                                                key={n.id}
-                                                className={`p-3 border-b border-white/10 hover:bg-white/5 cursor-pointer ${!n.is_read ? 'bg-white/5' : ''}`}
+                                                key={n._id}
+                                                className={`p-3 border-b border-white/10 hover:bg-white/5 cursor-pointer ${!n.isRead ? 'bg-white/5' : ''}`}
                                                 onClick={() => {
-                                                    if (!n.is_read) {
-                                                        api.markNotificationsRead(n.id);
-                                                        setUnreadCount(prev => Math.max(0, prev - 1));
-                                                        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+                                                    if (!n.isRead) {
+                                                        markAsRead({ notificationId: n._id });
                                                     }
                                                 }}
                                             >
                                                 <p className="text-sm">{n.title}</p>
                                                 <p className="text-xs text-white/50 mt-0.5">{n.message}</p>
-                                                <p className="text-xs text-white/30 mt-1 font-mono">{new Date(n.created_at).toLocaleString()}</p>
+                                                <p className="text-xs text-white/30 mt-1 font-mono">{new Date(n._creationTime).toLocaleString()}</p>
                                             </div>
                                         ))
                                     )}

@@ -15,6 +15,7 @@ import {
     ChevronDown,
     Loader2,
     LogIn,
+    Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -24,7 +25,8 @@ import {
     DropdownItem,
     DropdownSeparator,
 } from "@/components/ui/Dropdown";
-import { api, type Board } from "@/lib/api";
+import { api } from "@convex/_generated/api";
+import { useQuery } from "convex/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NewBoardModal } from "@/components/features/NewBoardModal";
 
@@ -32,34 +34,22 @@ const navItems = [
     { label: "Discover", href: "/", icon: LayoutGrid },
     { label: "My Videos", href: "/videos", icon: Video },
     { label: "My Images", href: "/my-images", icon: Images },
+    { label: "Prompt Generator", href: "/tools/prompt-generator", icon: Sparkles },
 ];
 
 export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { user, signOut, isLoading: isAuthLoading } = useAuth();
-    const [boards, setBoards] = useState<Board[]>([]);
-    const [isLoadingBoards, setIsLoadingBoards] = useState(true);
-    const [isCreating, setIsCreating] = useState(false);
 
-    // Fetch boards on mount
-    useEffect(() => {
-        loadBoards();
-    }, []);
-
-    const loadBoards = async () => {
-        setIsLoadingBoards(true);
-        const result = await api.getBoards();
-        if (result.data?.boards) {
-            // Only show top-level boards (no parent_id)
-            setBoards(result.data.boards.filter(b => !b.parent_id));
-        }
-        setIsLoadingBoards(false);
-    };
+    // Convex queries - reactive updates
+    const boards = useQuery(api.boards.list, {});
+    // We can filter parent_id locally or add args to list query
+    const topLevelBoards = boards?.filter(b => !b.parentId) || [];
+    const isLoadingBoards = boards === undefined;
 
     const handleNewFolder = async (boardData: { name: string; description: string }) => {
-        // Board is already created by NewBoardModal, just refresh and navigate
-        loadBoards();
+        // No manual refresh needed with Convex!
     };
 
     const handleProfile = () => {
@@ -116,7 +106,7 @@ export function Sidebar() {
             {/* Folders */}
             <div className="mt-8 flex-1 overflow-hidden">
                 <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest px-3 mb-2 block">
-                    Folders {boards.length > 0 && `(${boards.length})`}
+                    Folders {topLevelBoards.length > 0 && `(${topLevelBoards.length})`}
                 </span>
                 <div className="flex flex-col gap-0.5 overflow-y-auto max-h-[calc(100vh-400px)]">
                     {isLoadingBoards ? (
@@ -124,13 +114,13 @@ export function Sidebar() {
                             <Loader2 className="w-4 h-4 animate-spin" />
                             Loading...
                         </div>
-                    ) : boards.length > 0 ? (
-                        boards.map((board) => {
-                            const isActive = pathname === `/folder/${board.id}`;
+                    ) : topLevelBoards.length > 0 ? (
+                        topLevelBoards.map((board) => {
+                            const isActive = pathname === `/folder/${board._id}`;
                             return (
                                 <Link
-                                    key={board.id}
-                                    href={`/folder/${board.id}`}
+                                    key={board._id}
+                                    href={`/folder/${board._id}`}
                                     className={cn(
                                         "flex items-center gap-3 px-3 py-2 text-sm transition-all border-l-2",
                                         isActive
@@ -140,9 +130,9 @@ export function Sidebar() {
                                 >
                                     <FolderOpen className="w-4 h-4 opacity-60" />
                                     <span className="truncate">{board.name}</span>
-                                    {board.image_count !== undefined && board.image_count > 0 && (
+                                    {board.imageCount !== undefined && board.imageCount > 0 && (
                                         <span className="text-xs text-text-tertiary ml-auto">
-                                            {board.image_count}
+                                            {board.imageCount}
                                         </span>
                                     )}
                                 </Link>

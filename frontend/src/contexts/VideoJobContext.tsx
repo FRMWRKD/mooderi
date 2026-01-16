@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from "react";
-import { api } from "@/lib/api";
+import { api } from "@convex/_generated/api";
+import { useConvex } from "convex/react";
 
 // Processing stages with estimated durations (in seconds)
 const PROCESSING_STAGES = [
@@ -94,6 +95,8 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
         });
     }, [jobs]);
 
+    const convex = useConvex();
+
     // Poll for job statuses from backend
     useEffect(() => {
         if (jobs.length === 0) return;
@@ -105,12 +108,12 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
         if (activeJobs.length === 0) return;
 
         const interval = setInterval(async () => {
-            // Fetch all statuses in parallel to avoid race conditions
+            // Fetch all statuses in parallel
             const statusUpdates = await Promise.all(
                 activeJobs.map(async (job) => {
                     try {
-                        const result = await api.getVideoStatus(job.id);
-                        return { jobId: job.id, data: result.data, error: null };
+                        const video = await convex.query(api.videos.getById, { id: job.id as any });
+                        return { jobId: job.id, data: video, error: null };
                     } catch (e) {
                         console.error("Polling error for job", job.id, e);
                         return { jobId: job.id, data: null, error: e };
@@ -123,7 +126,11 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
                 const update = statusUpdates.find(u => u.jobId === j.id);
                 if (!update?.data) return j;
 
-                const status = update.data.status;
+                const video = update.data;
+                const status = video.status;
+
+                // Sync progress if available
+                const backendProgress = video.progress || 0;
 
                 // If backend reports a terminal state, use it
                 if (status === "pending_approval") {
@@ -131,10 +138,19 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
                 } else if (status === "completed") {
                     return { ...j, status: "completed", progress: 100, stage: "Complete!" };
                 } else if (status === "failed") {
-                    return { ...j, status: "failed", error: update.data.message || "Processing failed" };
-                } else if (status === "processing" && j.status === "queued") {
-                    // Start processing - initialize stage
-                    return { ...j, status: "processing", stageIndex: 0, stage: PROCESSING_STAGES[0].name };
+                    const errorMsg = video.errorMessage || "Processing failed";
+                    return { ...j, status: "failed", error: errorMsg };
+                } else if (status !== "pending") {
+                    // Start processing - update progress if backend has it
+                    // convex.videos.ts updates progress via webhooks
+                    return {
+                        ...j,
+                        status: "processing",
+                        progress: Math.max(j.progress, backendProgress),
+                        stage: video.status === "downloading" ? "Downloading..." :
+                            video.status === "extracting_frames" ? "Extracting frames..." :
+                                "Processing..."
+                    };
                 }
 
                 return j;
@@ -142,7 +158,7 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
         }, 3000);
 
         return () => clearInterval(interval);
-    }, [jobs]);
+    }, [jobs, convex]);
 
 
     const addJob = useCallback((jobId: string, url: string) => {

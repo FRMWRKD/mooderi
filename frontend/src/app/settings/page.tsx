@@ -1,70 +1,48 @@
 "use client";
 
 import { AppShell } from "@/components/layout";
-import { ProfileModal, SettingsModal } from "@/components/features";
 import { Button } from "@/components/ui/Button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, CreditCard, History, Shield, Bell, LogOut, Settings, Key, Loader2, Check, Video, Image, FolderPlus, Search } from "lucide-react";
+import { User, CreditCard, History, Bell, LogOut, Loader2, Check, Video, Image, FolderPlus, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 
 export default function SettingsPage() {
-    const { user, signOut, isLoading } = useAuth();
+    const { user: authUser, signOut, isLoading: isAuthLoading } = useAuth();
     const router = useRouter();
-    const [name, setName] = useState(user?.user_metadata?.full_name || "");
-    const [email, setEmail] = useState(user?.email || "");
-    const [credits, setCredits] = useState<number>(100);
+
+    // Convex hooks - use Supabase user ID to look up Convex user
+    const userData = useQuery(
+        api.users.getBySupabaseId,
+        authUser?.id ? { supabaseId: authUser.id } : "skip"
+    );
+    const activityData = useQuery(api.users.getActivity);
+    const updateProfile = useMutation(api.users.updateProfile);
+
+    // State
+    const [name, setName] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [preferences, setPreferences] = useState<Record<string, boolean>>({
-        email_notifications: true,
-        processing_alerts: true,
-        weekly_digest: false,
+        emailNotifications: true,
+        processingAlerts: true,
+        weeklyDigest: false,
     });
-    const [activities, setActivities] = useState<Array<{
-        id: string;
-        action_type: string;
-        action_details: Record<string, unknown>;
-        resource_id: string | null;
-        resource_type: string | null;
-        created_at: string;
-    }>>([]);
-    const [activitiesLoading, setActivitiesLoading] = useState(false);
 
+    // Sync from Convex data when loaded
     useEffect(() => {
-        if (user) {
-            api.getCredits().then(result => {
-                const data = result.data;
-                if (data) {
-                    setCredits(data.credits);
-                    if (data.preferences) {
-                        setPreferences(prev => ({ ...prev, ...data.preferences }));
-                    }
-                }
-            });
+        if (userData) {
+            setName(userData.name);
+            // setPreferences({ ...preferences, ...userData.preferences }); // TODO: Match schema structure
         }
-    }, [user]);
+    }, [userData]);
 
-    const handleSaveProfile = async () => {
-        setIsSaving(true);
-        setSaveSuccess(false);
 
-        const result = await api.updateProfile({ display_name: name });
-
-        if (result.data?.success) {
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 2000);
-        } else {
-            alert(result.error || "Failed to save profile");
-        }
-
-        setIsSaving(false);
-    };
-
-    if (isLoading) {
+    if (isAuthLoading || userData === undefined) {
         return (
             <AppShell>
                 <div className="max-w-2xl mx-auto p-8">
@@ -79,10 +57,25 @@ export default function SettingsPage() {
         );
     }
 
-    if (!user) {
+    if (!authUser) {
         router.push("/login");
         return null;
     }
+
+    const handleSaveProfile = async () => {
+        setIsSaving(true);
+        setSaveSuccess(false);
+
+        try {
+            await updateProfile({ supabaseId: authUser?.id, name: name });
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2000);
+        } catch (error) {
+            alert("Failed to save profile");
+        }
+
+        setIsSaving(false);
+    };
 
     const handleSignOut = async () => {
         if (confirm("Are you sure you want to sign out?")) {
@@ -90,6 +83,11 @@ export default function SettingsPage() {
             router.push("/");
         }
     };
+
+    // Derived values
+    const credits = userData?.credits || 0;
+    const activities = activityData?.activities || [];
+    const activitiesLoading = activityData === undefined;
 
     return (
         <AppShell>
@@ -110,17 +108,7 @@ export default function SettingsPage() {
                             <Bell className="w-4 h-4" />
                             Notifications
                         </TabsTrigger>
-                        <TabsTrigger value="history" className="gap-2" onClick={() => {
-                            if (activities.length === 0) {
-                                setActivitiesLoading(true);
-                                api.getActivity().then(result => {
-                                    if (result.data) {
-                                        setActivities(result.data.activities);
-                                    }
-                                    setActivitiesLoading(false);
-                                });
-                            }
-                        }}>
+                        <TabsTrigger value="history" className="gap-2">
                             <History className="w-4 h-4" />
                             History
                         </TabsTrigger>
@@ -144,7 +132,7 @@ export default function SettingsPage() {
                                 </label>
                                 <Input
                                     type="email"
-                                    value={email}
+                                    value={userData?.email || ""}
                                     disabled
                                     className="opacity-60"
                                 />
@@ -157,7 +145,7 @@ export default function SettingsPage() {
                                 <div>
                                     <h3 className="text-sm font-medium mb-1">Account</h3>
                                     <p className="text-sm text-text-secondary">
-                                        Signed in as <strong>{user.email}</strong>
+                                        Signed in as <strong>{userData?.email}</strong>
                                     </p>
                                 </div>
                                 <div className="flex gap-3">
@@ -233,28 +221,28 @@ export default function SettingsPage() {
                             <ToggleSetting
                                 label="Email notifications"
                                 description="Receive updates about your video processing"
-                                checked={preferences.email_notifications}
+                                checked={preferences.emailNotifications}
                                 onChange={(checked) => {
-                                    setPreferences(prev => ({ ...prev, email_notifications: checked }));
-                                    api.updatePreferences({ email_notifications: checked });
+                                    setPreferences(prev => ({ ...prev, emailNotifications: checked }));
+                                    // api.updatePreferences({ email_notifications: checked });
                                 }}
                             />
                             <ToggleSetting
                                 label="Processing complete alerts"
                                 description="Get notified when video analysis finishes"
-                                checked={preferences.processing_alerts}
+                                checked={preferences.processingAlerts}
                                 onChange={(checked) => {
-                                    setPreferences(prev => ({ ...prev, processing_alerts: checked }));
-                                    api.updatePreferences({ processing_alerts: checked });
+                                    setPreferences(prev => ({ ...prev, processingAlerts: checked }));
+                                    // api.updatePreferences({ processing_alerts: checked });
                                 }}
                             />
                             <ToggleSetting
                                 label="Weekly digest"
                                 description="Summary of your activity"
-                                checked={preferences.weekly_digest}
+                                checked={preferences.weeklyDigest}
                                 onChange={(checked) => {
-                                    setPreferences(prev => ({ ...prev, weekly_digest: checked }));
-                                    api.updatePreferences({ weekly_digest: checked });
+                                    setPreferences(prev => ({ ...prev, weeklyDigest: checked }));
+                                    // api.updatePreferences({ weekly_digest: checked });
                                 }}
                             />
                         </div>
@@ -276,7 +264,7 @@ export default function SettingsPage() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {activities.map((activity) => (
+                                    {activities.map((activity: any) => (
                                         <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
                                             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
                                                 {activity.action_type === 'video_processed' && <Video className="w-4 h-4" />}
@@ -287,7 +275,7 @@ export default function SettingsPage() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium">
-                                                    {activity.action_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                    {activity.action_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                                 </p>
                                                 <p className="text-xs text-text-tertiary">
                                                     {new Date(activity.created_at).toLocaleString()}

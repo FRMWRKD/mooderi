@@ -58,3 +58,4 @@ frames/
 # Secrets (extra safety)
 *.pem
 *.key
+.vercel

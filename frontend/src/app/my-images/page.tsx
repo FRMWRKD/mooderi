@@ -3,7 +3,9 @@
 import { AppShell } from "@/components/layout";
 import { ImageCard } from "@/components/features/ImageCard";
 import { Button } from "@/components/ui/Button";
-import { api, type Image } from "@/lib/api";
+import { api } from "@convex/_generated/api";
+import { useQuery } from "convex/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Images, ChevronDown, SlidersHorizontal, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
@@ -26,82 +28,43 @@ const FILTER_OPTIONS: { value: FilterOption; label: string }[] = [
 ];
 
 export default function MyImagesPage() {
-    const [images, setImages] = useState<Image[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { user } = useAuth();
     const [sortBy, setSortBy] = useState<SortOption>("newest");
     const [filterBy, setFilterBy] = useState<FilterOption>("all");
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-    const loadImages = useCallback(async (showFullLoader = true) => {
-        if (showFullLoader) {
-            setIsLoading(true);
-        } else {
-            setIsRefreshing(true);
-        }
-        setError(null);
-
-        // Build params based on filter and sort
-        const params: {
-            source_type?: string;
-            limit: number;
-            sort: string;
-            my_images: boolean;
-        } = {
-            limit: 100,
-            sort: sortBy === "oldest" ? "oldest" : "newest",
-            my_images: true,  // Show user's own images
-        };
-
-        // Apply source filter
-        if (filterBy !== "all") {
-            params.source_type = filterBy;
-        }
-
-        const result = await api.getFilteredImages(params);
 
 
-        if (result.data) {
-            let sortedImages = result.data.images || [];
+    const convexUser = useQuery(api.users.getBySupabaseId, user?.id ? { supabaseId: user.id } : "skip");
 
-            // Client-side sorting for mood/lighting
-            if (sortBy === "mood") {
-                sortedImages = [...sortedImages].sort((a, b) => (a.mood || "").localeCompare(b.mood || ""));
-            } else if (sortBy === "lighting") {
-                sortedImages = [...sortedImages].sort((a, b) => (a.lighting || "").localeCompare(b.lighting || ""));
-            }
+    // Now use convexUser._id for filtering
+    const userImages = useQuery(api.images.filter, {
+        limit: 100,
+        sort: sortBy === "oldest" ? "oldest" : "newest", // Simplified sort
+        sourceType: filterBy === "all" ? undefined : filterBy,
+        userId: convexUser?._id,
+        onlyPublic: false, // Show private images too
+    });
 
-            setImages(sortedImages);
-        } else {
-            // Fallback to regular images call
-            const fallback = await api.getImages({ limit: 50, sort: "newest" });
-            if (fallback.data) {
-                setImages(fallback.data.images || []);
-            } else {
-                setError(fallback.error || "Failed to load images");
-            }
-        }
-        setIsLoading(false);
-        setIsRefreshing(false);
-    }, [sortBy, filterBy]);
+    const isLoading = userImages === undefined;
+    const images = userImages?.images || [];
 
-    // Initial load and reload on filter/sort change
-    useEffect(() => {
-        loadImages();
-    }, [loadImages]);
+    // Filter Logic client side for mood/lighting if needed?
+    // api.images.filter supports mood/lighting args but UI here selects sort option "mood".
+    // "mood" sort isn't supported by backend sort param (only date/rating).
+    // So if sortBy='mood', disable backend sort and sort locally?
+    // Or just ignore.
 
-    // Auto-refresh when window gains focus
-    useEffect(() => {
-        const handleFocus = () => {
-            loadImages(false);
-        };
-        window.addEventListener("focus", handleFocus);
-        return () => window.removeEventListener("focus", handleFocus);
-    }, [loadImages]);
+    // Client-side sort fallback
+    const sortedImages = [...images];
+    if (sortBy === "mood") {
+        sortedImages.sort((a, b) => (a.mood || "").localeCompare(b.mood || ""));
+    } else if (sortBy === "lighting") {
+        sortedImages.sort((a, b) => (a.lighting || "").localeCompare(b.lighting || ""));
+    }
 
-    // Close menus when clicking outside
+    // Close menus when clicking outside (kept same)
     useEffect(() => {
         const handleClickOutside = () => {
             setShowSortMenu(false);
@@ -144,8 +107,7 @@ export default function MyImagesPage() {
                     <div>
                         <h1 className="text-3xl font-bold mb-1">My Images</h1>
                         <p className="text-text-secondary">
-                            {images.length} images in your library
-                            {isRefreshing && <Loader2 className="inline w-3 h-3 ml-2 animate-spin" />}
+                            {sortedImages.length} images in your library
                         </p>
                     </div>
 
@@ -230,15 +192,8 @@ export default function MyImagesPage() {
                     </div>
                 </div>
 
-                {/* Error State */}
-                {error && (
-                    <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400">
-                        {error}
-                    </div>
-                )}
-
                 {/* Content */}
-                {images.length === 0 ? (
+                {sortedImages.length === 0 ? (
                     <div className="text-center py-20">
                         <Images className="w-16 h-16 mx-auto mb-4 text-text-tertiary opacity-30" />
                         <h2 className="text-xl font-semibold mb-2">No images yet</h2>
@@ -256,11 +211,11 @@ export default function MyImagesPage() {
                     </div>
                 ) : (
                     <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-5">
-                        {images.map((image) => (
+                        {sortedImages.map((image) => (
                             <ImageCard
-                                key={image.id}
-                                id={image.id}
-                                imageUrl={image.image_url}
+                                key={image._id}
+                                id={image._id as any} // Temporary cast until ImageCard update
+                                imageUrl={image.imageUrl} // Note: imageUrl vs image_url (Convex uses imageUrl)
                                 mood={image.mood}
                                 colors={image.colors}
                                 tags={image.tags}

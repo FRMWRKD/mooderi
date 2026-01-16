@@ -1,3 +1,4 @@
+"use client";
 
 import {
     Modal,
@@ -6,12 +7,13 @@ import {
     ModalTitle,
     ModalBody,
     ModalFooter,
-    ModalCloseButton,
+    ModalCloseButton
 } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useState, useEffect } from "react";
-import { Check, CheckCircle2, Loader2, Images, Globe, Lock, FolderOpen, ChevronDown, Gift, Info } from "lucide-react";
-import { api, type Board } from "@/lib/api";
+import { Check, CheckCircle2, Loader2, Images, Globe, Lock, FolderOpen, ChevronDown, Gift } from "lucide-react";
+import { api } from "@convex/_generated/api";
+import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 
 interface FrameSelectionModalProps {
@@ -38,36 +40,13 @@ export function FrameSelectionModal({
     const [showSuccess, setShowSuccess] = useState(false);
 
     // New states for public/folder options
-    const [isPublic, setIsPublic] = useState(true); // Default to public (free)
+    const [isPublic, setIsPublic] = useState(true);
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-    const [folders, setFolders] = useState<Board[]>([]);
     const [showFolderMenu, setShowFolderMenu] = useState(false);
-    const [publicContributions, setPublicContributions] = useState(0); // Track for discount
 
-    // Fetch user's folders
-    useEffect(() => {
-        if (isOpen) {
-            loadFolders();
-            loadContributions();
-        }
-    }, [isOpen]);
-
-    const loadFolders = async () => {
-        const result = await api.getBoards();
-        if (result.data) {
-            setFolders(result.data.boards || []);
-        }
-    };
-
-    const loadContributions = async () => {
-        // This would come from user profile in a real implementation
-        // For now, we'll simulate it
-        const result = await api.getCredits();
-        if (result.data) {
-            // Check preferences for public_contributions count
-            setPublicContributions(0); // Would be from user profile
-        }
-    };
+    // Convex hooks
+    const boards = useQuery(api.boards.list, {});
+    const approveFrames = useMutation(api.videos.approveFrames);
 
     // Reset selected frames when frames prop changes
     useEffect(() => {
@@ -96,23 +75,18 @@ export function FrameSelectionModal({
     const handleConfirm = async () => {
         setIsSubmitting(true);
         try {
-            // Pass the public flag and folder to the API
-            const result = await api.approveFrames(jobId, selectedFrames, {
+            const result = await approveFrames({
+                videoId: jobId as any,
+                approvedUrls: selectedFrames,
                 isPublic,
-                folderId: selectedFolderId || undefined,
+                folderId: selectedFolderId as any || undefined,
             });
 
-            // Check for API error
-            if (result.error) {
-                throw new Error(result.error);
-            }
-
-            const count = result.data?.approved_count || selectedFrames.length;
+            const count = result.approved_count;
             setSavedCount(count);
             setShowSuccess(true);
             onComplete();
 
-            // Navigate to My Images after a brief delay so user sees success message
             setTimeout(() => {
                 router.push("/my-images");
             }, 1500);
@@ -135,219 +109,218 @@ export function FrameSelectionModal({
         onClose();
     };
 
-    // Calculate credits needed
     const creditsNeeded = isPublic ? 0 : selectedFrames.length;
     const freeCreditsEarned = isPublic ? Math.floor(selectedFrames.length / 10) : 0;
-    const selectedFolder = folders.find(f => f.id === selectedFolderId);
 
+    const boardsList = boards || [];
+    const selectedFolder = Array.isArray(boardsList) ? boardsList.find(f => f._id === selectedFolderId) : undefined;
+
+    // Use a div wrapper to avoid fragment issues, just in case
     return (
-        <Modal open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-            <ModalContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                <ModalHeader>
-                    <ModalTitle>
-                        {showSuccess ? "Images Saved!" : "Select Best Frames"}
-                    </ModalTitle>
-                    {!showSuccess && (
-                        <div className="text-sm text-text-secondary">
-                            {selectedFrames.length} selected / {frames.length} extracted
-                        </div>
-                    )}
-                </ModalHeader>
+        <div>
+            <Modal open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+                <ModalContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <ModalHeader>
+                        <ModalTitle>
+                            {showSuccess ? "Images Saved!" : "Select Best Frames"}
+                        </ModalTitle>
+                        {!showSuccess && (
+                            <div className="text-sm text-text-secondary">
+                                {selectedFrames.length} selected / {frames.length} extracted
+                            </div>
+                        )}
+                    </ModalHeader>
 
-                <ModalBody className="flex-1 overflow-y-auto p-6">
-                    {showSuccess ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
-                                <CheckCircle2 className="w-10 h-10 text-green-500" />
-                            </div>
-                            <h3 className="text-xl font-semibold mb-2">
-                                {savedCount} {savedCount === 1 ? "Image" : "Images"} Saved Successfully!
-                            </h3>
-                            <p className="text-text-secondary mb-2">
-                                Your frames have been added to your image library.
-                            </p>
-                            {isPublic && savedCount && (
-                                <p className="text-sm text-green-400 mb-4 flex items-center gap-1">
-                                    <Gift className="w-4 h-4" />
-                                    Thanks for contributing to the community!
-                                    {freeCreditsEarned > 0 && (
-                                        <span className="font-medium ml-1">+{freeCreditsEarned} free credits earned</span>
-                                    )}
-                                </p>
-                            )}
-                            {selectedFolder && (
-                                <p className="text-sm text-accent-blue mb-4">
-                                    Saved to folder: {selectedFolder.name}
-                                </p>
-                            )}
-                            <div className="flex gap-3">
-                                <Button variant="secondary" onClick={handleClose}>
-                                    Close
-                                </Button>
-                                <Button variant="default" onClick={handleGoToMyImages}>
-                                    <Images className="w-4 h-4 mr-2" />
-                                    View My Images
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Options Bar */}
-                            <div className="flex flex-wrap gap-4 mb-6 p-4 bg-white/5 rounded-xl">
-                                {/* Public/Private Toggle */}
-                                <div className="flex-1 min-w-[200px]">
-                                    <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Visibility</div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setIsPublic(true)}
-                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border transition-all text-sm ${isPublic
-                                                ? "bg-green-500/20 border-green-500/50 text-green-400"
-                                                : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
-                                                }`}
-                                        >
-                                            <Globe className="w-4 h-4" />
-                                            Public
-                                            <span className="text-xs px-1.5 py-0.5 bg-green-500/30 rounded">FREE</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setIsPublic(false)}
-                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border transition-all text-sm ${!isPublic
-                                                ? "bg-accent-blue/20 border-accent-blue/50 text-accent-blue"
-                                                : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
-                                                }`}
-                                        >
-                                            <Lock className="w-4 h-4" />
-                                            Private
-                                            <span className="text-xs px-1.5 py-0.5 bg-white/10 rounded">{selectedFrames.length} credits</span>
-                                        </button>
-                                    </div>
+                    <ModalBody className="flex-1 overflow-y-auto p-6">
+                        {showSuccess ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                                    <CheckCircle2 className="w-10 h-10 text-green-500" />
                                 </div>
+                                <h3 className="text-xl font-semibold mb-2">
+                                    {savedCount} {savedCount === 1 ? "Image" : "Images"} Saved Successfully!
+                                </h3>
+                                <p className="text-text-secondary mb-2">
+                                    Your frames have been added to your image library.
+                                </p>
+                                {isPublic && savedCount && (
+                                    <p className="text-sm text-green-400 mb-4 flex items-center gap-1">
+                                        <Gift className="w-4 h-4" />
+                                        Thanks for contributing to the community!
+                                        {freeCreditsEarned > 0 && (
+                                            <span className="font-medium ml-1">+{freeCreditsEarned} free credits earned</span>
+                                        )}
+                                    </p>
+                                )}
+                                {selectedFolder && (
+                                    <p className="text-sm text-accent-blue mb-4">
+                                        Saved to folder: {selectedFolder.name}
+                                    </p>
+                                )}
+                                <div className="flex gap-3">
+                                    <Button variant="secondary" onClick={handleClose}>
+                                        Close
+                                    </Button>
+                                    <Button variant="default" onClick={handleGoToMyImages}>
+                                        <Images className="w-4 h-4 mr-2" />
+                                        View My Images
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex flex-wrap gap-4 mb-6 p-4 bg-white/5 rounded-xl">
+                                    <div className="flex-1 min-w-[200px]">
+                                        <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Visibility</div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setIsPublic(true)}
+                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border transition-all text-sm ${isPublic
+                                                    ? "bg-green-500/20 border-green-500/50 text-green-400"
+                                                    : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
+                                                    }`}
+                                            >
+                                                <Globe className="w-4 h-4" />
+                                                Public
+                                                <span className="text-xs px-1.5 py-0.5 bg-green-500/30 rounded">FREE</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setIsPublic(false)}
+                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border transition-all text-sm ${!isPublic
+                                                    ? "bg-accent-blue/20 border-accent-blue/50 text-accent-blue"
+                                                    : "bg-white/5 border-white/10 text-text-secondary hover:bg-white/10"
+                                                    }`}
+                                            >
+                                                <Lock className="w-4 h-4" />
+                                                Private
+                                                <span className="text-xs px-1.5 py-0.5 bg-white/10 rounded">{selectedFrames.length} credits</span>
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                {/* Folder Selection */}
-                                <div className="flex-1 min-w-[200px]">
-                                    <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Save to Folder (optional)</div>
-                                    <div className="relative">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setShowFolderMenu(!showFolderMenu);
-                                            }}
-                                            className="w-full flex items-center justify-between gap-2 py-2.5 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-sm"
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <FolderOpen className="w-4 h-4 text-text-tertiary" />
-                                                {selectedFolder ? selectedFolder.name : "No folder selected"}
-                                            </span>
-                                            <ChevronDown className="w-4 h-4 text-text-tertiary" />
-                                        </button>
-                                        {showFolderMenu && (
-                                            <div className="absolute left-0 top-full mt-1 w-full bg-black border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden max-h-48 overflow-y-auto">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedFolderId(null);
-                                                        setShowFolderMenu(false);
-                                                    }}
-                                                    className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${!selectedFolderId ? "bg-white/10 text-accent-blue" : ""}`}
-                                                >
-                                                    No folder
-                                                </button>
-                                                {folders.map(folder => (
+                                    <div className="flex-1 min-w-[200px]">
+                                        <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Save to Folder (optional)</div>
+                                        <div className="relative">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowFolderMenu(!showFolderMenu);
+                                                }}
+                                                className="w-full flex items-center justify-between gap-2 py-2.5 px-4 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-sm"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <FolderOpen className="w-4 h-4 text-text-tertiary" />
+                                                    {selectedFolder ? selectedFolder.name : "No folder selected"}
+                                                </span>
+                                                <ChevronDown className="w-4 h-4 text-text-tertiary" />
+                                            </button>
+                                            {showFolderMenu && (
+                                                <div className="absolute left-0 top-full mt-1 w-full bg-black border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden max-h-48 overflow-y-auto">
                                                     <button
-                                                        key={folder.id}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setSelectedFolderId(folder.id);
+                                                            setSelectedFolderId(null);
                                                             setShowFolderMenu(false);
                                                         }}
-                                                        className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${selectedFolderId === folder.id ? "bg-white/10 text-accent-blue" : ""}`}
+                                                        className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${!selectedFolderId ? "bg-white/10 text-accent-blue" : ""}`}
                                                     >
-                                                        {folder.name}
+                                                        No folder
                                                     </button>
-                                                ))}
-                                                {folders.length === 0 && (
-                                                    <div className="px-4 py-3 text-sm text-text-tertiary">
-                                                        No folders yet. Create one in the sidebar.
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Info Box */}
-                            {isPublic && (
-                                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-3 text-sm">
-                                    <Gift className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <span className="text-green-400 font-medium">Community Contributor Bonus:</span>
-                                        <span className="text-text-secondary ml-1">
-                                            For every 10 public images, you earn 1 free credit! Share to grow the library.
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Frame Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {frames.map((frame, index) => {
-                                    const isSelected = selectedFrames.includes(frame);
-                                    return (
-                                        <div
-                                            key={index}
-                                            className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all group ${isSelected ? 'border-accent-blue' : 'border-transparent opacity-60 hover:opacity-90'
-                                                }`}
-                                            onClick={() => toggleFrame(frame)}
-                                        >
-                                            <img
-                                                src={frame}
-                                                alt={`Frame ${index}`}
-                                                className="w-full h-full object-cover"
-                                            />
-                                            {isSelected && (
-                                                <div className="absolute top-2 right-2 w-6 h-6 bg-accent-blue rounded-full flex items-center justify-center shadow-md">
-                                                    <Check className="w-4 h-4 text-white" />
+                                                    {boardsList.map(folder => (
+                                                        <button
+                                                            key={folder._id}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedFolderId(folder._id);
+                                                                setShowFolderMenu(false);
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors ${selectedFolderId === folder._id ? "bg-white/10 text-accent-blue" : ""}`}
+                                                        >
+                                                            {folder.name}
+                                                        </button>
+                                                    ))}
+                                                    {boardsList.length === 0 && (
+                                                        <div className="px-4 py-3 text-sm text-text-tertiary">
+                                                            No folders yet. Create one in the sidebar.
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
-                                            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
-                </ModalBody>
+                                    </div>
+                                </div>
 
-                {!showSuccess && (
-                    <ModalFooter className="flex-col gap-3 sm:flex-row">
-                        <div className="flex-1 text-sm text-text-secondary">
-                            {isPublic ? (
-                                <span className="text-green-400">✨ Free – Contributing to community</span>
-                            ) : (
-                                <span>Cost: <span className="font-medium text-text-primary">{creditsNeeded} credits</span></span>
-                            )}
-                        </div>
-                        <div className="flex gap-3">
-                            <Button variant="secondary" onClick={handleClose}>Discard</Button>
-                            <Button
-                                variant="default"
-                                onClick={handleConfirm}
-                                disabled={isSubmitting || selectedFrames.length === 0}
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    `Save ${selectedFrames.length} Images`
+                                {isPublic && (
+                                    <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-3 text-sm">
+                                        <Gift className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <span className="text-green-400 font-medium">Community Contributor Bonus:</span>
+                                            <span className="text-text-secondary ml-1">
+                                                For every 10 public images, you earn 1 free credit! Share to grow the library.
+                                            </span>
+                                        </div>
+                                    </div>
                                 )}
-                            </Button>
-                        </div>
-                    </ModalFooter>
-                )}
-            </ModalContent>
-        </Modal>
+
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {frames.map((frame, index) => {
+                                        const isSelected = selectedFrames.includes(frame);
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all group ${isSelected ? 'border-accent-blue' : 'border-transparent opacity-60 hover:opacity-90'
+                                                    }`}
+                                                onClick={() => toggleFrame(frame)}
+                                            >
+                                                <img
+                                                    src={frame}
+                                                    alt={`Frame ${index}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {isSelected && (
+                                                    <div className="absolute top-2 right-2 w-6 h-6 bg-accent-blue rounded-full flex items-center justify-center shadow-md">
+                                                        <Check className="w-4 h-4 text-white" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+                    </ModalBody>
+
+                    {!showSuccess && (
+                        <ModalFooter className="flex-col gap-3 sm:flex-row">
+                            <div className="flex-1 text-sm text-text-secondary">
+                                {isPublic ? (
+                                    <span className="text-green-400">✨ Free – Contributing to community</span>
+                                ) : (
+                                    <span>Cost: <span className="font-medium text-text-primary">{creditsNeeded} credits</span></span>
+                                )}
+                            </div>
+                            <div className="flex gap-3">
+                                <Button variant="secondary" onClick={handleClose}>Discard</Button>
+                                <Button
+                                    variant="default"
+                                    onClick={handleConfirm}
+                                    disabled={isSubmitting || selectedFrames.length === 0}
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        `Save ${selectedFrames.length} Images`
+                                    )}
+                                </Button>
+                            </div>
+                        </ModalFooter>
+                    )}
+                </ModalContent>
+            </Modal>
+        </div>
     );
 }

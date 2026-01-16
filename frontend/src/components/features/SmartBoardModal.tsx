@@ -14,11 +14,13 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Sparkles, Loader2, Grid3X3, Save } from "lucide-react";
-import { api, type Image } from "@/lib/api";
+import { useAction, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
 
 interface SmartBoardModalProps {
     trigger?: React.ReactNode;
-    onBoardCreated?: (boardId: string, images: Image[]) => void;
+    onBoardCreated?: (boardId: string, images: any[]) => void;
 }
 
 type GenerationStatus = "idle" | "generating" | "preview" | "saving" | "complete";
@@ -29,9 +31,14 @@ export function SmartBoardModal({ trigger, onBoardCreated }: SmartBoardModalProp
     const [count, setCount] = useState(20);
     const [strictness, setStrictness] = useState(0.55);
     const [status, setStatus] = useState<GenerationStatus>("idle");
-    const [previewImages, setPreviewImages] = useState<Image[]>([]);
+    const [previewImages, setPreviewImages] = useState<any[]>([]);
     const [boardName, setBoardName] = useState("");
     const [error, setError] = useState<string | null>(null);
+
+    // Convex hooks
+    const generateSmartBoard = useAction(api.ai.generateSmartBoard);
+    const createBoard = useMutation(api.boards.create);
+    const addImage = useMutation(api.boards.addImage);
 
     const handleGenerate = async () => {
         if (!prompt.trim()) return;
@@ -41,15 +48,11 @@ export function SmartBoardModal({ trigger, onBoardCreated }: SmartBoardModalProp
         setPreviewImages([]);
 
         try {
-            const result = await api.generateSmartBoard(prompt, count, strictness);
+            const result = await generateSmartBoard({ prompt, count, strictness });
 
-            if (result.error) {
-                throw new Error(result.error);
-            }
-
-            if (result.data?.images && result.data.images.length > 0) {
-                setPreviewImages(result.data.images);
-                setBoardName(result.data.board?.name || `Smart: ${prompt.slice(0, 30)}`);
+            if (result.images && result.images.length > 0) {
+                setPreviewImages(result.images);
+                setBoardName(result.board?.name || `Smart: ${prompt.slice(0, 30)}`);
                 setStatus("preview");
             } else {
                 setError("No matching images found. Try a different prompt or lower the strictness.");
@@ -70,21 +73,24 @@ export function SmartBoardModal({ trigger, onBoardCreated }: SmartBoardModalProp
 
         try {
             // Create board
-            const createResult = await api.createBoard({
+            const createResult = await createBoard({
                 name: boardName || `Smart Board: ${prompt.slice(0, 20)}`,
                 description: `Generated from: "${prompt}"`,
-                is_public: false, // Smart boards are private by default
+                isPublic: false, // Smart boards are private by default
             });
 
-            if (!createResult.data?.id) {
-                throw new Error(createResult.error || "Failed to create board");
+            if (!createResult.success || !createResult.id) {
+                throw new Error("Failed to create board");
             }
 
-            const boardId = createResult.data.id;
+            const boardId = createResult.id;
 
             // Add all images to board
             for (const image of previewImages) {
-                await api.addToBoard(boardId, image.id);
+                await addImage({
+                    boardId: boardId as Id<"boards">,
+                    imageId: image._id as Id<"images">,
+                });
             }
 
             setStatus("complete");
@@ -207,9 +213,9 @@ export function SmartBoardModal({ trigger, onBoardCreated }: SmartBoardModalProp
                                 </div>
                                 <div className="grid grid-cols-5 gap-2 max-h-64 overflow-y-auto p-1">
                                     {previewImages.map((img) => (
-                                        <div key={img.id} className="aspect-square">
+                                        <div key={img._id} className="aspect-square">
                                             <img
-                                                src={img.image_url}
+                                                src={img.imageUrl}
                                                 alt=""
                                                 className="w-full h-full object-cover rounded border border-white/10"
                                             />

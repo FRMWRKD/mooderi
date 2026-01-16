@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { VideoJobProvider } from "@/contexts/VideoJobContext";
+import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,11 +20,13 @@ export default function RootLayout({
     return (
         <html lang="en" className="dark">
             <body className={inter.className}>
-                <AuthProvider>
-                    <VideoJobProvider>
-                        {children}
-                    </VideoJobProvider>
-                </AuthProvider>
+                <ConvexClientProvider>
+                    <AuthProvider>
+                        <VideoJobProvider>
+                            {children}
+                        </VideoJobProvider>
+                    </AuthProvider>
+                </ConvexClientProvider>
             </body>
         </html>
     );

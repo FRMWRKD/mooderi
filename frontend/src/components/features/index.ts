@@ -8,3 +8,5 @@ export { UploadModal } from "./UploadModal";
 export { SmartBoardModal } from "./SmartBoardModal";
 export { FrameSelectionModal } from "./FrameSelectionModal";
 export { VideoProcessingQueue } from "./VideoProcessingQueue";
+export { PromptGenerator } from "./PromptGenerator";
+export { PublicRequestFeed } from "./PublicRequestFeed";

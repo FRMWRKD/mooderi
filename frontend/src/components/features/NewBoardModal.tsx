@@ -14,6 +14,10 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { FolderPlus, Globe, Lock } from "lucide-react";
+import { api } from "@convex/_generated/api";
+import { useQuery, useMutation } from "convex/react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Id } from "@convex/_generated/dataModel";
 
 interface NewBoardModalProps {
     trigger?: React.ReactNode;
@@ -33,45 +37,54 @@ export function NewBoardModal({
 
     const [isLoading, setIsLoading] = useState(false);
 
+    const { user: authUser } = useAuth();
+    const user = useQuery(api.users.getBySupabaseId, authUser?.id ? { supabaseId: authUser.id } : "skip");
+    const createBoard = useMutation(api.boards.create);
+    const addImage = useMutation(api.boards.addImage);
+
     const handleSubmit = async () => {
         if (!name.trim()) return;
 
         setIsLoading(true);
         try {
-            // Check if user is logged in first
-            const { api } = await import("@/lib/api");
-            const isLoggedIn = await api.isAuthenticated();
-
-            if (!isLoggedIn) {
-                alert("Please log in to create a board. Click the Login button in the top right corner.");
+            if (!user) {
+                alert("Please log in to create a board");
                 setIsLoading(false);
                 return;
             }
 
             // Call API to create board
-            const result = await api.createBoard({
+            const result = await createBoard({
                 name,
                 description,
-                is_public: isPublic
+                isPublic,
+                userId: user._id,
             });
 
-            if (result.data?.success && result.data.id) {
+            if (result.success && result.id) {
                 // If we need to save an image immediately
                 if (imageIdToSave) {
-                    await api.addToBoard(result.data!.id, imageIdToSave);
+                    // Check if imageIdToSave is a string (Convex ID)
+                    if (typeof imageIdToSave === 'string') {
+                        await addImage({
+                            boardId: result.id,
+                            imageId: imageIdToSave as any // Cast to Id<"images">
+                        });
+                    } else {
+                        console.warn("Cannot save Supabase image ID to Convex board:", imageIdToSave);
+                    }
                 }
 
-                onBoardCreated?.({ name: result.data.name, description: description });
+                onBoardCreated?.({ name: result.name, description: description });
                 setIsOpen(false);
                 setName("");
                 setDescription("");
             } else {
-                console.error("Board creation error:", result.error);
-                alert(result.error || "Failed to create board. Please try again.");
+                alert("Failed to create board");
             }
         } catch (error) {
             console.error("Board creation exception:", error);
-            alert("An unexpected error occurred. Please check the console for details.");
+            alert("An unexpected error occurred: " + (error instanceof Error ? error.message : "Unknown error"));
         } finally {
             setIsLoading(false);
         }

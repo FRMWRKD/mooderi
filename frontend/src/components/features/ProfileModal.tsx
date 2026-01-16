@@ -25,8 +25,8 @@ export function ProfileModal({ trigger }: ProfileModalProps) {
     const { user, signOut } = useAuth();
     // In a real app we might want to update the profile via API
     // For now we just display the auth data
-    const [name, setName] = useState(user?.user_metadata?.full_name || "User");
-    const [email, setEmail] = useState(user?.email || "");
+    const [name, setName] = useState((user as any)?.user_metadata?.full_name || (user as any)?.name || "User");
+    const [email, setEmail] = useState((user as any)?.email || "");
 
     return (
         <Modal>

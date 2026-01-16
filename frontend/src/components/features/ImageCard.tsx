@@ -14,11 +14,14 @@ import {
     DropdownSeparator,
 } from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
-import { api, type Board } from "@/lib/api";
-import { NewBoardModal } from "@/components/features/NewBoardModal";
+import { api } from "@convex/_generated/api";
+import { useQuery, useMutation } from "convex/react";
+import { Id } from "@convex/_generated/dataModel";
+import { useAuth } from "@/contexts/AuthContext";
+import { NewBoardModal } from "./NewBoardModal";
 
 interface ImageCardProps {
-    id: number;
+    id: string | number;
     imageUrl: string;
     prompt?: string;
     mood?: string;
@@ -57,12 +60,6 @@ export function ImageCard({
 
     const handleDragEnd = () => {
         setIsDragging(false);
-    };
-
-    const handleSearchSimilar = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        router.push(`/image/${id}?tab=similar`);
     };
 
     return (
@@ -158,58 +155,51 @@ export function ImageCard({
     );
 }
 
-export function SaveToBoardDropdown({ imageId }: { imageId: number }) {
-    const router = useRouter();
+export function SaveToBoardDropdown({ imageId }: { imageId: string | number }) {
     const [searchQuery, setSearchQuery] = useState("");
-    const [boards, setBoards] = useState<Board[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [savedBoards, setSavedBoards] = useState<string[]>([]);
-    const [isSaving, setIsSaving] = useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
 
-    // Fetch boards when dropdown opens
-    useEffect(() => {
-        if (isOpen && boards.length === 0) {
-            loadBoards();
-        }
-    }, [isOpen]);
+    // Check if we can save (must be Convex ID aka string)
+    const canSave = typeof imageId === 'string';
 
-    const loadBoards = async () => {
-        setIsLoading(true);
-        const result = await api.getBoards();
-        if (result.data?.boards) {
-            setBoards(result.data.boards);
-        }
-        setIsLoading(false);
-    };
+    const boards = useQuery(api.boards.list, {
+        imageId: canSave ? (imageId as Id<"images">) : undefined
+    });
 
-    const filteredBoards = boards.filter((b) =>
+    const filteredBoards = (boards || []).filter((b: any) =>
         b.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const handleSaveToBoard = async (boardId: string, boardName: string) => {
-        if (savedBoards.includes(boardId)) {
-            // Remove from board
-            setIsSaving(boardId);
-            const result = await api.removeFromBoard(boardId, imageId);
-            if (result.data?.success) {
-                setSavedBoards(savedBoards.filter(id => id !== boardId));
-            }
-            setIsSaving(null);
-        } else {
-            // Add to board
-            setIsSaving(boardId);
-            const result = await api.addToBoard(boardId, imageId);
-            if (result.data?.success) {
-                setSavedBoards([...savedBoards, boardId]);
+    const addToBoard = useMutation(api.boards.addImage);
+    const removeFromBoard = useMutation(api.boards.removeImage);
+
+    const handleToggleBoard = async (boardId: string, hasImage: boolean) => {
+        if (!canSave) {
+            alert("Legacy images cannot be saved to new boards. Please re-import or wait for migration.");
+            return;
+        }
+
+        setIsProcessing(boardId);
+        try {
+            if (hasImage) {
+                await removeFromBoard({
+                    boardId: boardId as Id<"boards">,
+                    imageId: imageId as Id<"images">,
+                });
             } else {
-                alert(result.error || "Failed to save to board");
+                await addToBoard({
+                    boardId: boardId as Id<"boards">,
+                    imageId: imageId as Id<"images">,
+                });
             }
-            setIsSaving(null);
+        } catch (e) {
+            console.error("Failed to toggle board", e);
+            alert("Failed to update board");
+        } finally {
+            setIsProcessing(null);
         }
     };
-
-
 
     return (
         <Dropdown open={isOpen} onOpenChange={setIsOpen}>
@@ -237,28 +227,37 @@ export function SaveToBoardDropdown({ imageId }: { imageId: number }) {
                 <DropdownLabel>Your boards</DropdownLabel>
 
                 <div className="max-h-48 overflow-y-auto px-1">
-                    {isLoading ? (
+                    {!canSave ? (
+                        <div className="px-3 py-4 text-center text-text-tertiary text-sm text-yellow-500">
+                            Cannot save legacy image
+                        </div>
+                    ) : boards === undefined ? (
                         <div className="flex items-center justify-center py-4">
                             <Loader2 className="w-5 h-5 animate-spin text-text-tertiary" />
                         </div>
                     ) : filteredBoards.length > 0 ? (
-                        filteredBoards.map((board) => (
+                        filteredBoards.map((board: any) => (
                             <DropdownItem
-                                key={board.id}
+                                key={board._id}
                                 className="flex items-center justify-between"
-                                onClick={() => handleSaveToBoard(board.id, board.name)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleToggleBoard(board._id, board.hasImage);
+                                }}
                             >
                                 <div className="flex items-center gap-2">
                                     <Grid3X3 className="w-4 h-4 opacity-60" />
                                     <span className="truncate">{board.name}</span>
                                 </div>
-                                <div className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${savedBoards.includes(board.id)
-                                    ? "bg-accent-blue text-white"
-                                    : "bg-white/10 hover:bg-accent-blue"
-                                    }`}>
-                                    {isSaving === board.id ? (
+                                <div className={cn(
+                                    "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
+                                    board.hasImage
+                                        ? "bg-accent-blue text-white"
+                                        : "bg-white/10 hover:bg-accent-blue"
+                                )}>
+                                    {isProcessing === board._id ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : savedBoards.includes(board.id) ? (
+                                    ) : board.hasImage ? (
                                         <Check className="w-4 h-4" />
                                     ) : (
                                         <Plus className="w-4 h-4" />
@@ -266,10 +265,6 @@ export function SaveToBoardDropdown({ imageId }: { imageId: number }) {
                                 </div>
                             </DropdownItem>
                         ))
-                    ) : boards.length === 0 ? (
-                        <div className="px-3 py-4 text-center text-text-tertiary text-sm">
-                            No boards yet. Create one below!
-                        </div>
                     ) : (
                         <div className="px-3 py-4 text-center text-text-tertiary text-sm">
                             No boards match &quot;{searchQuery}&quot;
@@ -288,11 +283,9 @@ export function SaveToBoardDropdown({ imageId }: { imageId: number }) {
                         </DropdownItem>
                     }
                     onBoardCreated={(board) => {
-                        // Refresh boards list
-                        loadBoards();
-                        // Ideally we would select it automatically, but waiting for refresh is okay for now
+                        // Convex updates automatically
                     }}
-                    imageIdToSave={imageId}
+                    imageIdToSave={canSave ? (imageId) as any : undefined}
                 />
             </DropdownContent>
         </Dropdown>

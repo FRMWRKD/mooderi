@@ -31,86 +31,54 @@ import {
     DropdownItem,
     DropdownSeparator,
 } from "@/components/ui/Dropdown";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, type Image } from "@/lib/api";
 import Link from "next/link";
-
-interface BoardData {
-    id: string;
-    name: string;
-    description?: string;
-    is_public: boolean;
-    parent_id?: string;
-}
-
-interface Subfolder {
-    id: string;
-    name: string;
-    is_public: boolean;
-}
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
 
 export default function FolderPage({ params }: { params: { id: string } }) {
     const router = useRouter();
-    const [board, setBoard] = useState<BoardData | null>(null);
-    const [images, setImages] = useState<Image[]>([]);
-    const [subfolders, setSubfolders] = useState<Subfolder[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const boardId = params.id as Id<"boards">;
+
+    // Convex queries
+    const boardData = useQuery(api.boards.getWithImages, { boardId });
+    const subfolders = useQuery(api.boards.getSubfolders, { parentId: boardId });
+
+    // Convex mutations
+    const updateBoard = useMutation(api.boards.update);
+    const deleteBoard = useMutation(api.boards.remove);
+    const createSubfolder = useMutation(api.boards.create);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isNewSubfolderModalOpen, setIsNewSubfolderModalOpen] = useState(false);
+
+    // Local state for modals
     const [editName, setEditName] = useState("");
     const [editDescription, setEditDescription] = useState("");
     const [newSubfolderName, setNewSubfolderName] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        loadBoard();
-    }, [params.id]);
-
-    const loadBoard = async () => {
-        setIsLoading(true);
-        setError(null);
-
-        const result = await api.getBoard(params.id);
-
-        if (result.error) {
-            setError(result.error);
-            // Fallback to mock data for demo
-            setBoard({
-                id: params.id,
-                name: params.id === "inspiration" ? "Inspiration" : "Board",
-                description: "Collection of references",
-                is_public: false,
-            });
-            setImages([]);
-            setSubfolders([]);
-        } else if (result.data) {
-            setBoard(result.data.board);
-            setImages(result.data.images);
-            setSubfolders(result.data.subfolders || []);
-            setEditName(result.data.board.name);
-            setEditDescription(result.data.board.description || "");
-        }
-
-        setIsLoading(false);
-    };
+    // Derived state
+    const isLoading = boardData === undefined || subfolders === undefined;
+    const board = boardData;
+    const images = boardData?.images || [];
+    const displaySubfolders = subfolders || [];
 
     const handleSaveChanges = async () => {
         if (!board) return;
         setIsSaving(true);
 
-        const result = await api.updateBoard(board.id, {
-            name: editName,
-            description: editDescription,
-        });
-
-        if (result.data?.success) {
-            setBoard({ ...board, name: editName, description: editDescription });
+        try {
+            await updateBoard({
+                id: boardId,
+                name: editName,
+                description: editDescription,
+            });
             setIsEditModalOpen(false);
-        } else {
-            alert(result.error || "Failed to save changes");
+        } catch (error) {
+            alert("Failed to save changes");
         }
 
         setIsSaving(false);
@@ -119,14 +87,13 @@ export default function FolderPage({ params }: { params: { id: string } }) {
     const handleToggleVisibility = async () => {
         if (!board) return;
 
-        const result = await api.updateBoard(board.id, {
-            is_public: !board.is_public,
-        });
-
-        if (result.data?.success) {
-            setBoard({ ...board, is_public: !board.is_public });
-        } else {
-            alert(result.error || "Failed to update visibility");
+        try {
+            await updateBoard({
+                id: boardId,
+                isPublic: !board.isPublic,
+            });
+        } catch (error) {
+            alert("Failed to update visibility");
         }
     };
 
@@ -137,19 +104,18 @@ export default function FolderPage({ params }: { params: { id: string } }) {
             return;
         }
 
-        const result = await api.deleteBoard(board.id);
-
-        if (result.data?.success) {
+        try {
+            await deleteBoard({ id: boardId });
             router.push("/");
-        } else {
-            alert(result.error || "Failed to delete board");
+        } catch (error) {
+            alert("Failed to delete board");
         }
     };
 
     const handleShare = () => {
         if (!board) return;
 
-        const shareUrl = `${window.location.origin}/folder/${board.id}`;
+        const shareUrl = `${window.location.origin}/folder/${board._id}`;
         navigator.clipboard.writeText(shareUrl);
         alert("Board link copied to clipboard!");
     };
@@ -158,24 +124,27 @@ export default function FolderPage({ params }: { params: { id: string } }) {
         if (!newSubfolderName.trim() || !board) return;
         setIsSaving(true);
 
-        const result = await api.createBoard({
-            name: newSubfolderName,
-            parent_id: board.id,
-        });
-
-        if (result.data?.success) {
-            setSubfolders([...subfolders, {
-                id: result.data.id,
-                name: result.data.name,
-                is_public: false
-            }]);
+        try {
+            await createSubfolder({
+                name: newSubfolderName,
+                parentId: boardId,
+            });
             setNewSubfolderName("");
             setIsNewSubfolderModalOpen(false);
-        } else {
-            alert(result.error || "Failed to create subfolder");
+        } catch (error) {
+            alert("Failed to create subfolder");
         }
 
         setIsSaving(false);
+    };
+
+    // Initialize edit modal state when opening
+    const openEditModal = () => {
+        if (board) {
+            setEditName(board.name);
+            setEditDescription(board.description || "");
+            setIsEditModalOpen(true);
+        }
     };
 
     if (isLoading) {
@@ -193,21 +162,34 @@ export default function FolderPage({ params }: { params: { id: string } }) {
         );
     }
 
+    if (!board) {
+        return (
+            <AppShell>
+                <div className="text-center py-20">
+                    <h2 className="text-xl font-semibold mb-2">Folder not found</h2>
+                    <Button variant="secondary" asChild>
+                        <Link href="/">Go Home</Link>
+                    </Button>
+                </div>
+            </AppShell>
+        );
+    }
+
     return (
         <AppShell>
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                     <div>
-                        {board?.parent_id && (
-                            <Link href={`/folder/${board.parent_id}`} className="text-sm text-text-tertiary hover:text-text-secondary flex items-center gap-1 mb-2">
+                        {board.parentId && (
+                            <Link href={`/folder/${board.parentId}`} className="text-sm text-text-tertiary hover:text-text-secondary flex items-center gap-1 mb-2">
                                 <ArrowLeft className="w-3 h-3" />
                                 Back to parent folder
                             </Link>
                         )}
                         <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-3xl font-bold">{board?.name}</h1>
-                            {board?.is_public ? (
+                            <h1 className="text-3xl font-bold">{board.name}</h1>
+                            {board.isPublic ? (
                                 <span className="flex items-center gap-1 text-xs text-accent-blue">
                                     <Globe className="w-3 h-3" />
                                     Public
@@ -219,11 +201,11 @@ export default function FolderPage({ params }: { params: { id: string } }) {
                                 </span>
                             )}
                         </div>
-                        {board?.description && (
+                        {board.description && (
                             <p className="text-text-secondary">{board.description}</p>
                         )}
                         <p className="text-sm text-text-tertiary mt-2">
-                            {images.length} images{subfolders.length > 0 ? ` · ${subfolders.length} subfolders` : ""}
+                            {images.length} images{displaySubfolders.length > 0 ? ` · ${displaySubfolders.length} subfolders` : ""}
                         </p>
                     </div>
 
@@ -240,11 +222,7 @@ export default function FolderPage({ params }: { params: { id: string } }) {
                                 </Button>
                             </DropdownTrigger>
                             <DropdownContent align="end">
-                                <DropdownItem onClick={() => {
-                                    setEditName(board?.name || "");
-                                    setEditDescription(board?.description || "");
-                                    setIsEditModalOpen(true);
-                                }}>
+                                <DropdownItem onClick={openEditModal}>
                                     <Pencil className="w-4 h-4 mr-2" />
                                     Edit Folder
                                 </DropdownItem>
@@ -253,7 +231,7 @@ export default function FolderPage({ params }: { params: { id: string } }) {
                                     New Subfolder
                                 </DropdownItem>
                                 <DropdownItem onClick={handleToggleVisibility}>
-                                    {board?.is_public ? (
+                                    {board.isPublic ? (
                                         <>
                                             <Lock className="w-4 h-4 mr-2" />
                                             Make Private
@@ -276,14 +254,14 @@ export default function FolderPage({ params }: { params: { id: string } }) {
                 </div>
 
                 {/* Subfolders */}
-                {subfolders.length > 0 && (
+                {displaySubfolders.length > 0 && (
                     <div>
                         <h3 className="text-sm font-medium text-text-secondary mb-3">Subfolders</h3>
                         <div className="flex flex-wrap gap-3">
-                            {subfolders.map((subfolder) => (
+                            {displaySubfolders.map((subfolder) => (
                                 <Link
-                                    key={subfolder.id}
-                                    href={`/folder/${subfolder.id}`}
+                                    key={subfolder._id}
+                                    href={`/folder/${subfolder._id}`}
                                     className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-border-subtle rounded-lg hover:bg-white/10 transition-colors"
                                 >
                                     <FolderPlus className="w-4 h-4 text-accent-blue" />
@@ -297,11 +275,11 @@ export default function FolderPage({ params }: { params: { id: string } }) {
                 {/* Images Grid */}
                 {images.length > 0 ? (
                     <div className="columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-5">
-                        {images.map((image) => (
+                        {images.filter((img) => img !== null).map((image) => (
                             <ImageCard
-                                key={image.id}
-                                id={image.id}
-                                imageUrl={image.image_url}
+                                key={image._id}
+                                id={image._id}
+                                imageUrl={image.imageUrl}
                                 mood={image.mood}
                                 colors={image.colors}
                             />

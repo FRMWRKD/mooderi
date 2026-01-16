@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
     Modal,
     ModalContent,
@@ -38,16 +39,18 @@ export function CreditsModal({ isOpen, onClose, credits }: CreditsModalProps) {
                         </p>
                     </div>
 
-                    {/* Actions Placeholder */}
+                    {/* Actions */}
                     <div className="grid grid-cols-2 gap-3">
                         <Button variant="secondary" className="gap-2 h-auto py-4 flex-col">
                             <History className="w-5 h-5 mb-1 text-accent-blue" />
                             <span className="text-xs">View History</span>
                         </Button>
-                        <Button variant="secondary" className="gap-2 h-auto py-4 flex-col">
-                            <CreditCard className="w-5 h-5 mb-1 text-accent-green" />
-                            <span className="text-xs">Buy More</span>
-                        </Button>
+                        <Link href="/pricing" onClick={onClose}>
+                            <Button variant="secondary" className="gap-2 h-auto py-4 flex-col w-full">
+                                <CreditCard className="w-5 h-5 mb-1 text-accent-green" />
+                                <span className="text-xs">Buy More</span>
+                            </Button>
+                        </Link>
                     </div>
 
                     {/* Info */}

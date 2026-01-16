@@ -563,6 +563,20 @@ def download_youtube(url: str, output_path: Path, cookies_path: Path) -> dict:
 
 
 # ============================================================
+# WEBHOOK HELPER
+# ============================================================
+
+def send_webhook(url: str, data: dict):
+    import httpx
+    if not url:
+        return
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            client.post(url, json=data)
+    except Exception as e:
+        print(f"[webhook] Failed to send to {url}: {e}")
+
+# ============================================================
 # MAIN - Returns both selected and rejected frames
 # ============================================================
 
@@ -570,7 +584,8 @@ def download_youtube(url: str, output_path: Path, cookies_path: Path) -> dict:
               volumes={VOLUME_PATH: video_volume})
 def process_video(video_url: str, quality_mode: str = "medium",
                   scene_threshold: float = 27.0, 
-                  max_frames: int = 50, max_workers: int = 30) -> dict:
+                  max_frames: int = 50, max_workers: int = 30,
+                  webhook_url: str = None, job_id: str = None, video_id: str = None) -> dict:
     """
     SMART video processing with quality presets.
     
@@ -616,6 +631,13 @@ def process_video(video_url: str, quality_mode: str = "medium",
         quality_mode = "medium"
         results["quality_mode"] = quality_mode
     
+    # Notify start
+    if webhook_url:
+        send_webhook(webhook_url, {
+            "job_id": job_id, "video_id": video_id, 
+            "status": "processing", "progress": 0
+        })
+    
     # 1. Download
     t = time.time()
     print(f"[1/5] Downloading... (quality_mode={quality_mode})")
@@ -646,6 +668,11 @@ def process_video(video_url: str, quality_mode: str = "medium",
     if dl.get("error"):
         results["errors"].append(dl["error"])
         results["status"] = "failed"
+        if webhook_url:
+            send_webhook(webhook_url, {
+                "job_id": job_id, "video_id": video_id, 
+                "status": "failed", "error": dl["error"]
+            })
         return results
     
     video_volume.commit()
@@ -739,6 +766,43 @@ def process_video(video_url: str, quality_mode: str = "medium",
     print(f"[5/5] Ready for approval: {len(uploaded_selected)} selected, {len(uploaded_rejected)} rejected")
     print(f"[DONE] Total time: {results['time']}s")
     
+    if webhook_url:
+        # Notify completion
+        # Note: We don't send individual frames in webhook because the payload is too large.
+        # Typically we'd use /modal/frame webhook for each frame if needed, 
+        # or Convex fetches them from storage/DB?
+        # The audit said "Modal frame webhook - receives individual frame data".
+        # So we should ideally have called that per frame.
+        # But our upload_to_storage just returns URL. 
+        # For now, let's send completed status.
+        send_webhook(webhook_url, {
+            "job_id": job_id, "video_id": video_id, 
+            "status": "completed", 
+            "progress": 100,
+            "frame_count": len(uploaded_selected),
+            "duration": results['time']
+        })
+        
+        # If we need to send individual frames, we should do it in step 4 loop.
+        # But for now, let's assume Convex will query by video_id or the user reviews them manually.
+        # Wait, if Convex doesn't know the URLs, it can't show them!
+        # convex/videos.ts approveFrames expects URLs.
+        # How does Convex get the URLs if we don't send them?
+        # The /modal/webhook handler doesn't take URLs.
+        # So we MUST use /modal/frame or update the final webhook to send URLs.
+        # convex/http.ts /modal/webhook does NOT look at 'frames' or 'urls'.
+        # convex/http.ts /modal/frame DOES add frames to DB.
+        
+        # We should call /modal/frame for each selected frame.
+        frame_endpoint = webhook_url.replace("/webhook", "/frame")
+        for frame in uploaded_selected:
+            send_webhook(frame_endpoint, {
+                "video_id": video_id,
+                "frame_number": 0, # We don't track original frame number closely here?
+                "image_url": frame["url"],
+                "user_id": None # Convex can infer
+            })
+    
     return results
 
 
@@ -828,10 +892,13 @@ def process_video_api(item: dict) -> dict:
     if not url:
         return {"error": "video_url required"}
     
-    return process_video.local(
+    return process_video.spawn(
         url, 
         quality_mode=quality_mode,
         scene_threshold=item.get("scene_threshold", 27.0), 
         max_frames=item.get("max_frames", 50), 
-        max_workers=item.get("max_workers", 30)
+        max_workers=item.get("max_workers", 30),
+        webhook_url=item.get("webhook_url"),
+        job_id=item.get("job_id"),
+        video_id=item.get("video_id")
     )

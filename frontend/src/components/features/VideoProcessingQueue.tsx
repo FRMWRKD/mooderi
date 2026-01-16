@@ -5,7 +5,8 @@ import { X, Minimize2, Maximize2, Play, Check, AlertCircle, Loader2, Plus, Chevr
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useVideoJobs, type VideoJob } from "@/contexts/VideoJobContext";
-import { api } from "@/lib/api";
+import { api } from "@convex/_generated/api";
+import { useMutation, useAction, useConvex } from "convex/react";
 import { FrameSelectionModal } from "./FrameSelectionModal";
 
 export function VideoProcessingQueue() {
@@ -16,6 +17,10 @@ export function VideoProcessingQueue() {
     const [quality, setQuality] = useState<"strict" | "medium" | "high">("medium");
     const [isAdding, setIsAdding] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
+
+    const createVideo = useMutation(api.videos.create);
+    const analyzeVideo = useAction(api.videos.analyze);
+    const convex = useConvex();
 
     // Frame selection modal state
     const [showFrameModal, setShowFrameModal] = useState(false);
@@ -39,11 +44,10 @@ export function VideoProcessingQueue() {
             // Trigger review click
             (async () => {
                 try {
-                    const framesResult = await api.getVideoFrames(pendingJob.id);
-                    const frames = framesResult.data?.selected_frames || framesResult.data?.frames;
+                    const frames = await convex.query(api.videos.getFrames, { videoId: pendingJob.id as any });
                     if (frames && frames.length > 0) {
-                        const frameUrls = frames.map((f: { url?: string; image_url?: string }) => f.url || f.image_url || "");
-                        setPendingFrames(frameUrls.filter(Boolean));
+                        const frameUrls = frames.map(f => f.imageUrl);
+                        setPendingFrames(frameUrls);
                         setPendingVideoUrl(pendingJob.url);
                         setSelectedJobId(pendingJob.id);
                         setShowFrameModal(true);
@@ -53,21 +57,18 @@ export function VideoProcessingQueue() {
                 }
             })();
         }
-    }, [jobs, autoOpenedJobs, showFrameModal]);
+    }, [jobs, autoOpenedJobs, showFrameModal, convex]);
 
     const handleReviewClick = async (job: VideoJob) => {
         if (job.status !== "pending_approval") return;
 
         try {
-            const framesResult = await api.getVideoFrames(job.id);
-            // API returns selected_frames with url property
-            const frames = framesResult.data?.selected_frames || framesResult.data?.frames;
+            const frames = await convex.query(api.videos.getFrames, { videoId: job.id as any });
             if (frames && frames.length > 0) {
-                // Handle both url and image_url formats
-                const frameUrls = frames.map((f: { url?: string; image_url?: string }) => f.url || f.image_url || "");
+                const frameUrls = frames.map(f => f.imageUrl);
                 const videoSource = job.url;
 
-                setPendingFrames(frameUrls.filter(Boolean));
+                setPendingFrames(frameUrls);
                 setPendingVideoUrl(videoSource);
                 setSelectedJobId(job.id);
                 setShowFrameModal(true);
@@ -85,15 +86,32 @@ export function VideoProcessingQueue() {
 
         setIsAdding(true);
         try {
-            const result = await api.analyzeVideo(newUrl, quality);
-            if (result.data?.job_id) {
-                addJob(result.data.job_id, newUrl);
+            // 1. Create video record in Convex
+            const result = await createVideo({ url: newUrl, qualityMode: quality });
+            if (result.success && result.id) {
+                // 2. Add to local queue context (for tracking)
+                const videoId = result.id;
+                addJob(videoId, newUrl);
+
+                // 3. Trigger Modal analysis via Action
+                // Note: We don't await this fully if we want UI to be responsive, 
+                // but analyze action typically waits for response. 
+                // However, since we added the job to queue, polling will pick up updates.
+                try {
+                    await analyzeVideo({ videoId: videoId, videoUrl: newUrl, qualityMode: quality });
+                } catch (err) {
+                    console.error("Analysis trigger failed:", err);
+                    // Job will stay in queued state or fail?
+                    // We might want to removeJob if this fails.
+                }
+
                 setNewUrl("");
                 setShowAddForm(false);
             } else {
-                alert(result.error || "Failed to start video processing");
+                alert("Failed to create video record");
             }
         } catch (e) {
+            console.error(e);
             alert("Failed to add video");
         } finally {
             setIsAdding(false);

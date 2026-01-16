@@ -4,9 +4,13 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import TextPressure from "@/components/ui/TextPressure";
 import Link from "next/link";
-import { type Image, api } from "@/lib/api";
-import { Menu, X, Check, Send } from "lucide-react";
+import { Menu, X, Check, Send, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { type Doc } from "@convex/_generated/dataModel";
+import { PromptGenerator } from "./PromptGenerator";
+import { PublicRequestFeed } from "./PublicRequestFeed";
 
 // Grid position type
 interface GridPosition {
@@ -112,10 +116,11 @@ const LAYOUTS: LayoutConfig[] = [
 ];
 
 // --- Hamburger Menu ---
-function HamburgerMenu({ onClose, onPricing, onContact }: {
+function HamburgerMenu({ onClose, onPricing, onContact, onGenerator }: {
     onClose: () => void;
     onPricing: () => void;
     onContact: () => void;
+    onGenerator: () => void;
 }) {
     return (
         <motion.div
@@ -125,15 +130,16 @@ function HamburgerMenu({ onClose, onPricing, onContact }: {
             transition={{ duration: 0.3 }}
             className="absolute top-full left-0 w-56 bg-black border-2 border-white z-50"
         >
+            <button onClick={() => { onGenerator(); onClose(); }} className="w-full h-12 px-6 flex items-center gap-2 border-b border-white hover:bg-white hover:text-black transition-colors">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-xs uppercase tracking-widest">Prompt Generator</span>
+            </button>
             <button onClick={() => { onPricing(); onClose(); }} className="w-full h-12 px-6 flex items-center border-b border-white hover:bg-white hover:text-black transition-colors">
                 <span className="text-xs uppercase tracking-widest">Pricing</span>
             </button>
             <button onClick={() => { onContact(); onClose(); }} className="w-full h-12 px-6 flex items-center border-b border-white hover:bg-white hover:text-black transition-colors">
                 <span className="text-xs uppercase tracking-widest">Contact</span>
             </button>
-            <Link href="#generator" onClick={onClose} className="w-full h-12 px-6 flex items-center border-b border-white hover:bg-white hover:text-black transition-colors">
-                <span className="text-xs uppercase tracking-widest">Prompt Generator</span>
-            </Link>
             <Link href="/login" onClick={onClose} className="w-full h-12 px-6 flex items-center hover:bg-white hover:text-black transition-colors">
                 <span className="text-xs uppercase tracking-widest">Login</span>
             </Link>
@@ -211,14 +217,54 @@ function ContactModal({ onClose }: { onClose: () => void }) {
     );
 }
 
+// --- Generator Modal ---
+function GeneratorModal({ onClose }: { onClose: () => void }) {
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 flex items-start justify-center overflow-y-auto p-4 md:p-8"
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 50, opacity: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                className="relative w-full max-w-4xl border-2 border-white bg-black my-8"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="h-14 border-b-2 border-white flex items-center justify-between px-6">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5" />
+                        <span className="text-lg font-bold uppercase tracking-widest">AI Prompt Generator</span>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white hover:text-black transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-6 md:p-8">
+                    <p className="text-white/60 text-sm mb-6 text-center">
+                        Try our AI for free! Analyze images or describe your vision.
+                        <span className="text-white/40"> Batch processing available after sign in.</span>
+                    </p>
+                    <PromptGenerator mode="landing" />
+                    <PublicRequestFeed />
+                </div>
+            </motion.div>
+        </motion.div>
+    );
+}
+
 // --- Image Modal - Vertical stack ---
-function ImageModal({ image, onClose }: { image: Image | null; onClose: () => void }) {
+function ImageModal({ image, onClose }: { image: Doc<"images"> | null; onClose: () => void }) {
     if (!image) return null;
 
     // Get prompt from multiple sources: prompt field, generated_prompts.text_to_image, or structured_analysis.short_description
     const displayPrompt = image.prompt
-        || image.generated_prompts?.text_to_image
-        || image.generated_prompts?.structured_analysis?.short_description
+        || image.generatedPrompts?.text_to_image
+        || image.generatedPrompts?.structured_analysis?.short_description
         || "No prompt available.";
 
     return (
@@ -236,7 +282,7 @@ function ImageModal({ image, onClose }: { image: Image | null; onClose: () => vo
                     <button onClick={onClose} className="p-1 hover:bg-white hover:text-black transition-colors"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="flex-none aspect-video bg-neutral-950 flex items-center justify-center border-b-2 border-white">
-                    <img src={image.image_url} alt="" className="max-w-full max-h-full object-contain" />
+                    <img src={image.imageUrl} alt="" className="max-w-full max-h-full object-contain" />
                 </div>
                 <div className="flex-1 overflow-auto p-4 min-h-0">
                     <h3 className="text-[10px] uppercase tracking-widest text-white/50 mb-2">Prompt</h3>
@@ -244,8 +290,8 @@ function ImageModal({ image, onClose }: { image: Image | null; onClose: () => vo
                 </div>
                 <div className="flex-none border-t-2 border-white p-4 flex items-center justify-between">
                     <div className="flex gap-6 text-xs uppercase tracking-widest">
-                        <span><span className="text-white/50">Mood:</span> {image.mood || image.generated_prompts?.structured_analysis?.mood?.emotion || "N/A"}</span>
-                        <span><span className="text-white/50">Score:</span> {image.aesthetic_score?.toFixed(1) || "N/A"}</span>
+                        <span><span className="text-white/50">Mood:</span> {image.mood || image.generatedPrompts?.structured_analysis?.mood?.emotion || "N/A"}</span>
+                        <span><span className="text-white/50">Score:</span> {image.aestheticScore?.toFixed(1) || "N/A"}</span>
                     </div>
                     <button className="h-8 px-4 border-2 border-white hover:bg-white hover:text-black transition-colors text-xs uppercase tracking-widest">Copy Prompt</button>
                 </div>
@@ -255,36 +301,42 @@ function ImageModal({ image, onClose }: { image: Image | null; onClose: () => vo
 }
 
 export function LandingPage() {
-    const [allImages, setAllImages] = useState<Image[]>([]);
+    // Replace api.getImages with Convex query
+    const rankedImages = useQuery(api.images.getRanked, { limit: 50 });
+
+    // Manage local state for carousel effect
+    const [allImages, setAllImages] = useState<Doc<"images">[]>([]);
+    const [currentImages, setCurrentImages] = useState<Doc<"images">[]>([]);
     const [sceneIndex, setSceneIndex] = useState(0);
-    const [currentImages, setCurrentImages] = useState<Image[]>([]);
     const [isPaused, setIsPaused] = useState(false);
-    const [selectedImage, setSelectedImage] = useState<Image | null>(null);
+    const [selectedImage, setSelectedImage] = useState<Doc<"images"> | null>(null);
     const [showPricing, setShowPricing] = useState(false);
     const [showContact, setShowContact] = useState(false);
+    const [showGenerator, setShowGenerator] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const lastScrollTime = useRef(0);
 
+    // Sync Convex data to local state
     useEffect(() => {
-        const loadImages = async () => {
-            const { data } = await api.getImages({ sort: "ranked", limit: 50 });
-            if (data?.images) {
-                setAllImages(data.images);
-                setCurrentImages(data.images.slice(0, 6));
+        if (rankedImages?.images) {
+            setAllImages(rankedImages.images);
+            // Only set initial current images if empty to avoid reset on refresh
+            if (currentImages.length === 0) {
+                setCurrentImages(rankedImages.images.slice(0, 6));
             }
-        };
-        loadImages();
-    }, []);
+        }
+    }, [rankedImages, currentImages.length]);
 
     const nextScene = useCallback(() => {
         if (allImages.length === 0) return;
+        // Shuffle for variety
         const shuffled = [...allImages].sort(() => Math.random() - 0.5);
         setCurrentImages(shuffled.slice(0, 6));
         setSceneIndex(prev => prev + 1);
     }, [allImages]);
 
     useEffect(() => {
-        if (!isPaused && allImages.length > 0 && !selectedImage && !showPricing && !showContact) {
+        if (!isPaused && allImages.length > 0 && !selectedImage && !showPricing && !showContact && !showGenerator) {
             const duration = sceneIndex === 0 ? 8000 : 5500; // 5.5 seconds faster
             const timer = setTimeout(nextScene, duration);
             return () => clearTimeout(timer);
@@ -308,6 +360,14 @@ export function LandingPage() {
 
     const layout = LAYOUTS[sceneIndex % LAYOUTS.length];
 
+    if (!rankedImages) {
+        return (
+            <div className="fixed inset-0 bg-black text-white flex items-center justify-center">
+                <div className="text-xs uppercase tracking-widest animate-pulse">Loading...</div>
+            </div>
+        );
+    }
+
     return (
         <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden">
             <div className="absolute inset-8 md:inset-12 lg:inset-16 flex flex-col border-2 border-white bg-black">
@@ -317,7 +377,7 @@ export function LandingPage() {
                     <button onClick={() => setShowMenu(!showMenu)} className="h-full px-4 flex items-center border-r-2 border-white hover:bg-white hover:text-black transition-colors">
                         {showMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                     </button>
-                    <AnimatePresence>{showMenu && <HamburgerMenu onClose={() => setShowMenu(false)} onPricing={() => setShowPricing(true)} onContact={() => setShowContact(true)} />}</AnimatePresence>
+                    <AnimatePresence>{showMenu && <HamburgerMenu onClose={() => setShowMenu(false)} onPricing={() => setShowPricing(true)} onContact={() => setShowContact(true)} onGenerator={() => setShowGenerator(true)} />}</AnimatePresence>
                     <div className="h-full px-4 md:px-6 flex items-center border-r-2 border-white"><span className="text-sm md:text-lg font-bold tracking-tighter uppercase">MOODERI</span></div>
                     <button onClick={() => setShowPricing(true)} className="h-full px-4 md:px-6 flex items-center border-r-2 border-white hover:bg-white hover:text-black transition-colors"><span className="text-[10px] md:text-xs uppercase tracking-widest">Pricing</span></button>
                     <button onClick={() => setShowContact(true)} className="h-full px-4 flex items-center border-r-2 border-white hover:bg-white hover:text-black transition-colors hidden md:flex"><span className="text-xs uppercase tracking-widest">Contact</span></button>
@@ -341,7 +401,7 @@ export function LandingPage() {
                     <button onClick={() => setShowPricing(true)} className="h-full flex items-center justify-center border-r-2 border-white hover:bg-white hover:text-black transition-colors">Pricing</button>
                     <button onClick={() => setShowContact(true)} className="h-full flex items-center justify-center border-r-2 border-white hover:bg-white hover:text-black transition-colors">Contact</button>
                     <div className="h-full flex items-center px-4 relative overflow-hidden">
-                        {!isPaused && !selectedImage && !showPricing && !showContact && (
+                        {!isPaused && !selectedImage && !showPricing && !showContact && !showGenerator && (
                             <motion.div key={`progress-${sceneIndex}`} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: sceneIndex === 0 ? 10 : 7, ease: "linear" }} className="absolute left-0 top-0 bottom-0 bg-white/25 w-full origin-left" />
                         )}
                         <span className="relative z-10 text-white/50">Scroll to explore</span>
@@ -353,6 +413,7 @@ export function LandingPage() {
                 {selectedImage && <ImageModal image={selectedImage} onClose={() => setSelectedImage(null)} />}
                 {showPricing && <PricingModal onClose={() => setShowPricing(false)} />}
                 {showContact && <ContactModal onClose={() => setShowContact(false)} />}
+                {showGenerator && <GeneratorModal onClose={() => setShowGenerator(false)} />}
             </AnimatePresence>
         </div>
     );
@@ -361,8 +422,8 @@ export function LandingPage() {
 // --- Grid Cell with CSS transitions ---
 function GridCell({ cell, images, onImageClick }: {
     cell: GridCell;
-    images: Image[];
-    onImageClick: (img: Image) => void;
+    images: Doc<"images">[];
+    onImageClick: (img: Doc<"images">) => void;
 }) {
     const image = cell.imageIndex !== undefined ? images[cell.imageIndex] : null;
     const pos = cell.position;
@@ -384,7 +445,7 @@ function GridCell({ cell, images, onImageClick }: {
     if (cell.type === "image" && image) {
         return (
             <div style={style} className="border border-white cursor-pointer group" onClick={() => onImageClick(image)}>
-                <img src={image.image_url} alt="" className="w-full h-full object-cover" />
+                <img src={image.imageUrl} alt="" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="text-[10px] uppercase tracking-widest border border-white px-3 py-2 bg-black">View Prompt</span>
                 </div>
