@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { auth } from "./auth";
 import { polar } from "./payments";
+import { generateWithGoogle, generateWithFal, testApiKey } from "./imageGeneration";
 
 /**
  * HTTP Endpoints
@@ -16,6 +17,7 @@ auth.addHttpRoutes(http);
 
 // Polar webhook routes (payment events)
 // Endpoint: /polar/events
+// Type cast needed due to @convex-dev/polar router type mismatch with httpRouter
 polar.registerRoutes(http as any, {
   onSubscriptionCreated: async (ctx: any, event: any) => {
     console.log("[Polar] Subscription created:", event.data.id);
@@ -168,18 +170,54 @@ http.route({
 });
 
 // Helper to map Modal status to our status enum
-function mapModalStatus(modalStatus: string): string {
-  const statusMap: Record<string, string> = {
+// Maps to actual schema values: pending, downloading, processing, extracting_frames, analyzing, completed, pending_approval, failed
+function mapModalStatus(modalStatus: string): "pending" | "downloading" | "processing" | "extracting_frames" | "analyzing" | "completed" | "pending_approval" | "failed" {
+  const statusMap: Record<string, "pending" | "downloading" | "processing" | "extracting_frames" | "analyzing" | "completed" | "pending_approval" | "failed"> = {
     pending: "pending",
     downloading: "downloading",
     processing: "processing",
     extracting: "extracting_frames",
     analyzing: "analyzing",
     completed: "completed",
+    pending_approval: "pending_approval",
     failed: "failed",
     error: "failed",
   };
   return statusMap[modalStatus] || "processing";
 }
+
+// ============================================
+// SIMPLE BUILDER IMAGE GENERATION
+// ============================================
+
+/**
+ * Generate image with Google Gemini
+ * POST /generate/google
+ */
+http.route({
+  path: "/generate/google",
+  method: "POST",
+  handler: generateWithGoogle,
+});
+
+/**
+ * Generate image with Fal.ai
+ * POST /generate/fal
+ */
+http.route({
+  path: "/generate/fal",
+  method: "POST",
+  handler: generateWithFal,
+});
+
+/**
+ * Test API key validity
+ * POST /api-key/test
+ */
+http.route({
+  path: "/api-key/test",
+  method: "POST",
+  handler: testApiKey,
+});
 
 export default http;

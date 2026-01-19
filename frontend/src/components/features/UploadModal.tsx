@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Upload, Globe, Lock, Image as ImageIcon, X, Loader2, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useMutation, useAction, useQuery } from "convex/react";
+import { useMutation, useAction, useConvex } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { Id } from "@convex/_generated/dataModel";
 
 interface UploadModalProps {
     trigger?: React.ReactNode;
@@ -39,9 +39,13 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
     const { user } = useAuth();
 
     // Convex hooks
-    const convexUser = useQuery(api.users.getBySupabaseId, user?.id ? { supabaseId: user.id } : "skip");
+    // const convexUser = useQuery(api.users.getBySupabaseId, user?.id ? { supabaseId: user.id } : "skip");
+    const generateUploadUrl = useMutation(api.images.generateUploadUrl);
     const createImage = useMutation(api.images.create);
     const analyzeImage = useAction(api.ai.analyzeImage);
+
+    // Convex client for one-off queries
+    const convexClient = useConvex();
 
     const handleFileSelect = (selectedFile: File) => {
         if (!selectedFile.type.startsWith("image/")) {
@@ -84,59 +88,60 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
         setError(null);
 
         try {
-            // Get current user from Supabase for storage path
-            const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-            if (!supabaseUser) {
+            if (!user) {
                 setError("Please log in to upload images");
                 setStatus("error");
                 return;
             }
 
-            // Generate unique filename
-            const ext = file.name.split(".").pop();
-            const filename = `${supabaseUser.id}/${Date.now()}.${ext}`;
+            setProgress(10);
 
-            setProgress(20);
+            // 1. Get short-lived upload URL
+            const postUrl = await generateUploadUrl();
 
-            // Upload to Supabase Storage (Convex doesn't have file storage)
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from("images")
-                .upload(filename, file, {
-                    cacheControl: "3600",
-                    upsert: false,
-                });
+            setProgress(30);
 
-            if (uploadError) {
-                throw new Error(uploadError.message);
-            }
-
-            setProgress(50);
-
-            // Get public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from("images")
-                .getPublicUrl(filename);
-
-            // Create image record in Convex
-            const imageId = await createImage({
-                imageUrl: publicUrl,
-                isPublic: isPublic,
-                sourceType: "upload",
-                userId: convexUser?._id,
+            // 2. Upload file to Convex Storage
+            const result = await fetch(postUrl, {
+                method: "POST",
+                headers: { "Content-Type": file.type },
+                body: file,
             });
 
-            setProgress(70);
+            if (!result.ok) {
+                throw new Error(`Upload failed: ${result.statusText}`);
+            }
+
+            const { storageId } = await result.json();
+
+            setProgress(60);
+
+            // 3. Create image record with storage ID
+            const imageId = await createImage({
+                storageId: storageId as Id<"_storage">,
+                isPublic: isPublic,
+                sourceType: "upload",
+                // userId is handled by mutation using ctx.auth
+            });
+
+            setProgress(80);
             setStatus("analyzing");
 
-            // Trigger AI analysis via Convex action
+            // 4. Trigger AI analysis
+            // Fetch the created image to get its URL
             try {
-                await analyzeImage({
-                    imageId: imageId,
-                    imageUrl: publicUrl,
-                });
-                console.log("[UploadModal] AI analysis complete");
+                const createdImage = await convexClient.query(api.images.getById, { id: imageId });
+                if (createdImage?.imageUrl) {
+                    await analyzeImage({
+                        imageId: imageId,
+                        imageUrl: createdImage.imageUrl,
+                    });
+                    console.log("[UploadModal] AI analysis triggered");
+                } else {
+                    console.warn("[UploadModal] Could not get image URL for analysis");
+                }
             } catch (analysisError) {
-                console.warn("[UploadModal] Analysis failed, but image was uploaded:", analysisError);
+                console.warn("[UploadModal] Analysis trigger failed (non-fatal):", analysisError);
             }
 
             setProgress(100);

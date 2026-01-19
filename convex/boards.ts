@@ -213,17 +213,22 @@ export const remove = mutation({
       .collect();
     
     for (const subfolder of subfolders) {
-      // Recursively delete subfolder's board_images
-      const subBoardImages = await ctx.db
-        .query("boardImages")
-        .withIndex("by_board", (q) => q.eq("boardId", subfolder._id))
-        .collect();
-      
-      for (const bi of subBoardImages) {
-        await ctx.db.delete(bi._id);
+      try {
+        // Recursively delete subfolder's board_images
+        const subBoardImages = await ctx.db
+          .query("boardImages")
+          .withIndex("by_board", (q) => q.eq("boardId", subfolder._id))
+          .collect();
+        
+        for (const bi of subBoardImages) {
+          await ctx.db.delete(bi._id);
+        }
+        
+        await ctx.db.delete(subfolder._id);
+      } catch (e) {
+        console.error(`Failed to delete subfolder ${subfolder._id}:`, e);
+        // Continue with other subfolders - don't let one failure stop deletion
       }
-      
-      await ctx.db.delete(subfolder._id);
     }
     
     // Delete the board itself

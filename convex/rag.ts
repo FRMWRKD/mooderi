@@ -69,7 +69,7 @@ const rag = new RAG(components.rag, {
         usage: { tokens: embeddings.reduce((acc, e) => acc + e.usage.tokens, 0) },
       };
     },
-  } as any,
+  } as any, // Type cast required for @convex-dev/rag AI SDK v2 compatibility - custom embedding interface
   embeddingDimension: 768, // Google text-embedding-004 outputs 768 dimensions
   filterNames: ["mood", "lighting", "sourceType"],
 });

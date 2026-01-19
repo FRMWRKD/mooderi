@@ -27,6 +27,7 @@ export default defineSchema({
   images: defineTable({
     // Core fields
     imageUrl: v.string(),
+    storageId: v.optional(v.id("_storage")),
     thumbnailUrl: v.optional(v.string()),
     
     // AI-generated content
@@ -55,7 +56,16 @@ export default defineSchema({
     isCurated: v.optional(v.boolean()),
     
     // Auto-detected prompt category
-    detectedCategory: v.optional(v.string()), // e.g., "realistic", "anime", "cinematic"
+    detectedCategory: v.optional(v.union(
+      v.literal("youtube_thumbnail"),
+      v.literal("realistic"),
+      v.literal("anime"),
+      v.literal("illustration"),
+      v.literal("cinematic"),
+      v.literal("logo"),
+      v.literal("product"),
+      v.literal("abstract")
+    )),
     
     // Ownership & visibility
     userId: v.optional(v.id("users")),
@@ -406,5 +416,67 @@ export default defineSchema({
   })
     .index("by_prompt", ["systemPromptId"])
     .index("by_prompt_version", ["systemPromptId", "version"]),
+
+  // ============================================
+  // USER_API_KEYS TABLE - Encrypted API key storage
+  // ============================================
+  userApiKeys: defineTable({
+    userId: v.id("users"),
+    provider: v.union(v.literal("google"), v.literal("fal")),
+    encryptedKey: v.string(), // Base64 encoded (client-side encrypted)
+    isValid: v.optional(v.boolean()),
+    lastUsed: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_provider", ["userId", "provider"]),
+
+  // ============================================
+  // BUILDER_PRESETS TABLE - Click-to-select options
+  // ============================================
+  builderPresets: defineTable({
+    category: v.string(), // "shot_type", "lighting", "camera", "film_stock", "lens", "movie_look", "photographer", "filter", "aspect_ratio"
+    key: v.string(), // Unique identifier within category
+    label: v.string(), // Display name
+    promptFragment: v.string(), // Text to add to prompt
+    description: v.optional(v.string()), // Tooltip/help text
+    icon: v.optional(v.string()), // Emoji or icon name
+    sortOrder: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_category", ["category"])
+    .index("by_category_active", ["category", "isActive"])
+    .index("by_key", ["key"]),
+
+  // ============================================
+  // GENERATED_IMAGES TABLE - Simple Builder outputs
+  // ============================================
+  generatedImages: defineTable({
+    userId: v.optional(v.id("users")),
+    prompt: v.string(), // The constructed prompt
+    builderConfig: v.object({
+      subject: v.optional(v.string()),
+      environment: v.optional(v.string()),
+      shotType: v.optional(v.string()),
+      lighting: v.optional(v.string()),
+      camera: v.optional(v.string()),
+      filmStock: v.optional(v.string()),
+      lens: v.optional(v.string()),
+      movieLook: v.optional(v.string()),
+      photographer: v.optional(v.string()),
+      aspectRatio: v.optional(v.string()),
+      filters: v.optional(v.array(v.string())),
+      customModifiers: v.optional(v.string()),
+    }),
+    imageUrl: v.optional(v.string()), // Generated image URL (external)
+    storageId: v.optional(v.id("_storage")), // If saved to Convex storage
+    thumbnailUrl: v.optional(v.string()),
+    provider: v.optional(v.union(v.literal("google"), v.literal("fal"))),
+    isPublic: v.boolean(), // Goes to community feed
+    isSaved: v.optional(v.boolean()), // Subscriber saved to personal library
+    generationTime: v.optional(v.number()), // Ms to generate
+  })
+    .index("by_user", ["userId"])
+    .index("by_public", ["isPublic"])
+    .index("by_user_saved", ["userId", "isSaved"]),
 });
 

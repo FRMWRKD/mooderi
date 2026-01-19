@@ -151,6 +151,7 @@ export const generatePrompt = action({
   args: {
     text: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
     categoryKey: v.optional(v.string()), // Category for specialized prompts
     source: v.union(v.literal("landing"), v.literal("app")),
     clientKey: v.optional(v.string()), // IP hash for landing page
@@ -227,7 +228,12 @@ export const generatePrompt = action({
       // ============================================
       // CREDIT CHECK (App only)
       // ============================================
-    let creditsToCharge = args.imageUrl ? 2 : 1;
+    let finalImageUrl = args.imageUrl;
+    if (args.storageId) {
+      finalImageUrl = (await ctx.storage.getUrl(args.storageId)) ?? undefined;
+    }
+
+    let creditsToCharge = finalImageUrl ? 2 : 1;
     
     if (args.source === "app" && args.userId) {
       const user = await ctx.runQuery(api.users.getById, { id: args.userId });
@@ -246,7 +252,7 @@ export const generatePrompt = action({
       }
     }
 
-    console.log(`[generatePrompt] Starting - source: ${args.source}, hasImage: ${!!args.imageUrl}`);
+    console.log(`[generatePrompt] Starting - source: ${args.source}, hasImage: ${!!finalImageUrl}`);
 
     // ============================================
     // STEP 1: Image Analysis (if image provided)
@@ -259,7 +265,7 @@ export const generatePrompt = action({
     } | null = null;
     let textForEmbedding = args.text || "";
 
-    if (args.imageUrl && visionatiKey) {
+    if (finalImageUrl && visionatiKey) {
       console.log("[generatePrompt] Step 1: Analyzing image with Visionati...");
       
       if (args.clientKey) {
@@ -288,7 +294,7 @@ export const generatePrompt = action({
         role: 'prompt',
         feature: ['tags', 'colors', 'descriptions'],
         prompt: visionatiDbPrompt.content,
-        url: args.imageUrl,
+        url: finalImageUrl,
       };
 
       try {
@@ -723,7 +729,7 @@ Generate a prompt that matches the style and quality of the top-rated examples a
     // Save to promptRequests table
     await ctx.runMutation(api.promptRequests.saveRequest, {
       inputText: args.text,
-      inputImageUrl: args.imageUrl,
+      inputImageUrl: finalImageUrl,
       generatedPrompt,
       topMatchImageId: topMatch?.imageId,
       recommendationIds: recommendations.map(r => r.imageId),

@@ -319,8 +319,9 @@ export const getRanked = query({
  */
 export const create = mutation({
   args: {
-    imageUrl: v.string(),
-    thumbnailUrl: v.optional(v.string()),
+    imageUrl: v.optional(v.string()), // Optional if storageId provided
+    storageId: v.optional(v.id("_storage")),
+    thumbnailUrl: v.optional(v.string()), // Optional thumbnail URL
     prompt: v.optional(v.string()),
     mood: v.optional(v.string()),
     lighting: v.optional(v.string()),
@@ -332,10 +333,14 @@ export const create = mutation({
     videoId: v.optional(v.id("videos")),
     frameNumber: v.optional(v.number()),
     userId: v.optional(v.id("users")),
-    signature: v.optional(v.string()),
+    signature: v.optional(v.string()), // SHA-256 or perceptual hash for deduplication - implement in frontend
   },
   handler: async (ctx, args) => {
-    // Deduplication check
+    // Validate that we have either an image URL or a storage ID
+    if (!args.imageUrl && !args.storageId) {
+      throw new Error("Must provide either imageUrl or storageId");
+    }
+    // Signature-based deduplication (frontend should generate & pass hash on upload)
     if (args.signature) {
       const existing = await ctx.db
         .query("images")
@@ -347,8 +352,18 @@ export const create = mutation({
       }
     }
 
+    let finalImageUrl = args.imageUrl;
+    let finalStorageId = args.storageId;
+
+    // If storageId is provided, generate the public URL
+    if (args.storageId) {
+      finalImageUrl = (await ctx.storage.getUrl(args.storageId)) ?? "";
+      finalStorageId = args.storageId;
+    }
+
     return await ctx.db.insert("images", {
-      imageUrl: args.imageUrl,
+      imageUrl: finalImageUrl || "",
+      storageId: finalStorageId,
       thumbnailUrl: args.thumbnailUrl,
       prompt: args.prompt,
       mood: args.mood,
@@ -356,7 +371,7 @@ export const create = mutation({
       colors: args.colors,
       tags: args.tags,
       isPublic: args.isPublic ?? true,
-      sourceType: args.sourceType as any,
+      sourceType: args.sourceType as "upload" | "video_import" | "url_import" | undefined,
       sourceVideoUrl: args.sourceVideoUrl,
       videoId: args.videoId,
       frameNumber: args.frameNumber,
@@ -367,6 +382,16 @@ export const create = mutation({
       isCurated: false,
       signature: args.signature,
     });
+  },
+});
+
+/**
+ * Generate a short-lived upload URL for Convex Storage
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
   },
 });
 
@@ -385,6 +410,7 @@ export const update = mutation({
     tags: v.optional(v.array(v.string())),
     embedding: v.optional(v.array(v.float64())),
     aestheticScore: v.optional(v.float64()),
+    detectedCategory: v.optional(v.string()),
     status: v.optional(v.string()),
     isAnalyzed: v.optional(v.boolean()),
   },
@@ -451,72 +477,77 @@ export const vote = mutation({
       throw new Error("You must be logged in to vote");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
+    try {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
 
-    if (!user) throw new Error("User not found");
+      if (!user) throw new Error("User not found");
 
-    const image = await ctx.db.get(args.imageId);
-    if (!image) throw new Error("Image not found");
+      const image = await ctx.db.get(args.imageId);
+      if (!image) throw new Error("Image not found");
 
-    // Check if user already voted
-    const existingVote = await ctx.db
-      .query("userActions")
-      .withIndex("by_user_and_image", (q) => q.eq("userId", user._id).eq("imageId", args.imageId))
-      .filter((q) => q.or(
-        q.eq(q.field("actionType"), "like"),
-        q.eq(q.field("actionType"), "dislike")
-      ))
-      .first();
+      // Check if user already voted
+      const existingVote = await ctx.db
+        .query("userActions")
+        .withIndex("by_user_and_image", (q) => q.eq("userId", user._id).eq("imageId", args.imageId))
+        .filter((q) => q.or(
+          q.eq(q.field("actionType"), "like"),
+          q.eq(q.field("actionType"), "dislike")
+        ))
+        .first();
 
-    if (existingVote) {
-      // If same vote type, remove it (toggle off)
-      if (existingVote.actionType === args.voteType) {
-        await ctx.db.delete(existingVote._id);
-        
-        // Decrement count
-        if (args.voteType === "like") {
-          await ctx.db.patch(args.imageId, { likes: Math.max(0, (image.likes || 0) - 1) });
-        } else {
-          await ctx.db.patch(args.imageId, { dislikes: Math.max(0, (image.dislikes || 0) - 1) });
+      if (existingVote) {
+        // If same vote type, remove it (toggle off)
+        if (existingVote.actionType === args.voteType) {
+          await ctx.db.delete(existingVote._id);
+          
+          // Decrement count
+          if (args.voteType === "like") {
+            await ctx.db.patch(args.imageId, { likes: Math.max(0, (image.likes || 0) - 1) });
+          } else {
+            await ctx.db.patch(args.imageId, { dislikes: Math.max(0, (image.dislikes || 0) - 1) });
+          }
+          
+          return { success: true, removed: true };
         }
         
-        return { success: true, removed: true };
+        // If different vote type, swap it
+        await ctx.db.patch(existingVote._id, { actionType: args.voteType });
+        
+        const updates: any = {};
+        if (args.voteType === "like") {
+          updates.likes = (image.likes || 0) + 1;
+          updates.dislikes = Math.max(0, (image.dislikes || 0) - 1);
+        } else {
+          updates.likes = Math.max(0, (image.likes || 0) - 1);
+          updates.dislikes = (image.dislikes || 0) + 1;
+        }
+        await ctx.db.patch(args.imageId, updates);
+        
+        return { success: true, swapped: true };
       }
-      
-      // If different vote type, swap it
-      await ctx.db.patch(existingVote._id, { actionType: args.voteType });
-      
-      const updates: any = {};
-      if (args.voteType === "like") {
-        updates.likes = (image.likes || 0) + 1;
-        updates.dislikes = Math.max(0, (image.dislikes || 0) - 1);
-      } else {
-        updates.likes = Math.max(0, (image.likes || 0) - 1);
-        updates.dislikes = (image.dislikes || 0) + 1;
-      }
-      await ctx.db.patch(args.imageId, updates);
-      
-      return { success: true, swapped: true };
-    }
 
-    // New vote
-    await ctx.db.insert("userActions", {
-      userId: user._id,
-      imageId: args.imageId,
-      actionType: args.voteType,
-    });
-    
-    // Increment count
-    if (args.voteType === "like") {
-      await ctx.db.patch(args.imageId, { likes: (image.likes || 0) + 1 });
-    } else {
-      await ctx.db.patch(args.imageId, { dislikes: (image.dislikes || 0) + 1 });
+      // New vote
+      await ctx.db.insert("userActions", {
+        userId: user._id,
+        imageId: args.imageId,
+        actionType: args.voteType,
+      });
+      
+      // Increment count
+      if (args.voteType === "like") {
+        await ctx.db.patch(args.imageId, { likes: (image.likes || 0) + 1 });
+      } else {
+        await ctx.db.patch(args.imageId, { dislikes: (image.dislikes || 0) + 1 });
+      }
+      
+      return { success: true, added: true };
+    } catch (error: any) {
+      console.error("Vote operation failed:", error);
+      throw new Error(`Failed to process vote: ${error.message}`);
     }
-    
-    return { success: true, added: true };
   },
 });
 

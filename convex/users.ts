@@ -312,12 +312,36 @@ export const deductCredits = mutation({
 });
 
 /**
- * Get user activity history (stub)
+ * Get user activity history
  */
 export const getActivity = query({
-  args: {},
-  handler: async () => {
-    // TODO: Implement actual activity logging
-    return { activities: [] };
+  args: { 
+    userId: v.optional(v.id("users")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Get current user if userId not provided
+    let userId = args.userId;
+    if (!userId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) return { activities: [] };
+      
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+        .first();
+      
+      if (!user) return { activities: [] };
+      userId = user._id;
+    }
+    
+    // Fetch user actions (likes, copies, etc.)
+    const actions = await ctx.db
+      .query("userActions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(args.limit ?? 50);
+    
+    return { activities: actions };
   },
 });

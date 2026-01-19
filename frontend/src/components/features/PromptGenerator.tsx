@@ -18,8 +18,9 @@ import {
     ChevronDown,
     Palette
 } from "lucide-react";
+import { Id } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/Button";
-import { supabase } from "@/lib/supabase";
+import { useMutation } from "convex/react";
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -171,23 +172,11 @@ export const PromptGenerator = ({
 
     // Convex action (not mutation)
     const generatePrompt = useAction(api.promptGenerator.generatePrompt);
+    const generateUploadUrl = useMutation(api.images.generateUploadUrl);
 
     // Progress polling
     const clientKey = mode === "landing" ? getClientKey() : `user_${userId || "anon"}`;
     const progress = useQuery(api.progressStore.getProgress, { clientKey });
-
-    // Live Search (disabled - rag.searchPrompts is an action, not a query)
-    // TODO: Create a query version or use useAction with effect
-    const debouncedSearch = useDebounce(promptText, 800);
-    const searchEnabled = inputMode === "text" && debouncedSearch.length > 5 && !result && !isLoading;
-
-    // Temporarily disabled - rag.searchPrompts is an action, not compatible with useQuery
-    // const liveResults = useQuery(api.rag.searchPrompts,
-    //     searchEnabled
-    //         ? { query: debouncedSearch, limit: 10, clientKey, userId }
-    //         : "skip"
-    // );
-    const liveResults: any = null; // Placeholder
 
     // Handle image selection
     const handleImageSelect = useCallback((file: File) => {
@@ -221,30 +210,25 @@ export const PromptGenerator = ({
         }
     }, [handleImageSelect]);
 
-    // Upload image to Supabase Storage and get public URL
-    const uploadImage = async (file: File): Promise<string> => {
-        // Generate unique filename with timestamp
-        const ext = file.name.split(".").pop() || "jpg";
-        const filename = `prompt-generator/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    // Upload image to Convex Storage
+    const uploadImage = async (file: File): Promise<Id<"_storage">> => {
+        // 1. Get upload URL
+        const postUrl = await generateUploadUrl();
 
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from("images")
-            .upload(filename, file, {
-                cacheControl: "3600",
-                upsert: false,
-            });
+        // 2. Upload file
+        const result = await fetch(postUrl, {
+            method: "POST",
+            headers: { "Content-Type": file.type },
+            body: file,
+        });
 
-        if (uploadError) {
-            throw new Error(`Upload failed: ${uploadError.message}`);
+        if (!result.ok) {
+            throw new Error(`Upload failed: ${result.statusText}`);
         }
 
-        // Get the public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from("images")
-            .getPublicUrl(filename);
+        const { storageId } = await result.json();
 
-        return publicUrl;
+        return storageId as Id<"_storage">;
     };
 
     // Handle generation
@@ -264,16 +248,16 @@ export const PromptGenerator = ({
         setResult(null);
 
         try {
-            let imageUrl: string | undefined;
+            let storageId: Id<"_storage"> | undefined;
 
             if (inputMode === "image" && imageFile) {
                 // Upload image first
-                imageUrl = await uploadImage(imageFile);
+                storageId = await uploadImage(imageFile);
             }
 
             const response = await generatePrompt({
                 text: inputMode === "text" ? promptText : undefined,
-                imageUrl,
+                storageId,
                 categoryKey: selectedCategory || undefined,
                 source: mode,
                 clientKey: clientKey,
@@ -522,54 +506,7 @@ export const PromptGenerator = ({
                             />
                         )}
 
-                        {/* Live Inspiration Gallery */}
-                        <AnimatePresence>
-                            {searchEnabled && liveResults?.results && liveResults.results.length > 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className="pt-2 border-t border-white/10"
-                                >
-                                    <div className="flex items-center justify-between mb-3 px-1">
-                                        <span className="text-[10px] uppercase tracking-widest text-white/50 flex items-center gap-2">
-                                            <Sparkles className="w-3 h-3 text-yellow-500/50" />
-                                            Live Inspiration ({liveResults.results.length})
-                                        </span>
-                                    </div>
-                                    <div className="flex overflow-x-auto gap-3 pb-4 scrollbar-hide snap-x">
-                                        {liveResults.results.map((item: any) => (
-                                            <motion.div
-                                                key={item.entryId}
-                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                className="min-w-[140px] w-[140px] relative group cursor-pointer snap-start"
-                                                onClick={() => {
-                                                    // Optional: Append prompt or replace? 
-                                                    // For now just logged or could set it
-                                                    console.log("Selected style:", item.promptText);
-                                                }}
-                                            >
-                                                <div className="aspect-[3/4] overflow-hidden border border-white/20 group-hover:border-white/60 transition-colors">
-                                                    <img
-                                                        src={item.metadata?.imageUrl as string}
-                                                        alt="Inspiration"
-                                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                                        loading="lazy"
-                                                    />
-                                                </div>
-                                                {/* Prompt Tooltip/Overlay */}
-                                                <div className="absolute inset-0 bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end overflow-hidden">
-                                                    <p className="text-[9px] text-white/80 line-clamp-6 leading-relaxed">
-                                                        {item.promptText}
-                                                    </p>
-                                                </div>
-                                            </motion.div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+
 
                         {/* Error Display */}
                         {error && (

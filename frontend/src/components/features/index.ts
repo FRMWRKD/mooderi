@@ -10,3 +10,6 @@ export { FrameSelectionModal } from "./FrameSelectionModal";
 export { VideoProcessingQueue } from "./VideoProcessingQueue";
 export { PromptGenerator } from "./PromptGenerator";
 export { PublicRequestFeed } from "./PublicRequestFeed";
+export { SimplePromptBuilder } from "./SimplePromptBuilder";
+export { ApiKeySettings } from "./ApiKeySettings";
+

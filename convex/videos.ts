@@ -39,7 +39,7 @@ export const list = query({
     } else if (args.status) {
       videos = await ctx.db
         .query("videos")
-        .withIndex("by_status", (q) => q.eq("status", args.status as any))
+        .withIndex("by_status", (q) => q.eq("status", args.status as "pending" | "downloading" | "processing" | "extracting_frames" | "analyzing" | "completed" | "pending_approval" | "failed"))
         .order("desc")
         .collect();
     } else {
@@ -114,7 +114,7 @@ export const create = mutation({
     const videoId = await ctx.db.insert("videos", {
       url: args.url,
       title: args.title,
-      qualityMode: (args.qualityMode ?? "medium") as any,
+      qualityMode: (args.qualityMode ?? "medium") as "low" | "medium" | "high",
       userId: args.userId,
       isPublic: args.isPublic ?? true,
       status: "pending",
@@ -269,8 +269,8 @@ export const approveFrames = mutation({
         status: "completed", // Mark as completed so it shows up
         likes: 0,
         dislikes: 0,
-        // We miss frameNumber, scene_start etc. because UI only passes URLs
-        // In V2 we should pass full frame objects
+        // NOTE: frameNumber not currently tracked - frontend should pass array of {url, frameNumber} objects
+        // instead of just URLs for full metadata support
       });
 
       // Add to folder if requested
@@ -338,7 +338,7 @@ export const analyze = action({
         video_id: args.videoId,
         quality_mode: args.qualityMode ?? "medium",
         job_id: `convex-${args.videoId}`,
-        webhook_url: process.env.CONVEX_SITE_URL ? `${process.env.CONVEX_SITE_URL}/modal/webhook` : "https://hidden-falcon-801.convex.cloud/modal/webhook",
+        webhook_url: `${process.env.CONVEX_SITE_URL || "https://hidden-falcon-801.convex.cloud"}/modal/webhook`,
       }),
     });
 
