@@ -20,7 +20,7 @@ export default function SettingsPage() {
         api.users.getBySupabaseId,
         authUser?.id ? { supabaseId: authUser.id } : "skip"
     );
-    const activityData = useQuery(api.users.getActivity);
+    const activityData = useQuery(api.users.getActivity, {});
     const updateProfile = useMutation(api.users.updateProfile);
 
     // State

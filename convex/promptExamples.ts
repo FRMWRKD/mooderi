@@ -65,6 +65,34 @@ export const getById = query({
   },
 });
 
+/**
+ * Get random prompt starters for the helper.
+ * Fetches curated examples and shuffles them.
+ */
+export const getRandomStarters = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 5;
+    
+    // Get active examples from different categories
+    // detailed_portrait, cinematic_scenery, creative_abstract
+    const examples = await ctx.db
+      .query("promptExamples")
+      .withIndex("by_source", (q) => q.eq("source", "curated"))
+      .filter(q => q.eq(q.field("isActive"), true))
+      .take(50); // Take a pool to randomize from
+      
+    // Fisher-Yates shuffle to randomize
+    const shuffled = [...examples];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    return shuffled.slice(0, limit);
+  },
+});
+
 // ============================================
 // MUTATIONS
 // ============================================

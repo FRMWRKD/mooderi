@@ -21,6 +21,7 @@ import {
 import { Id } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/Button";
 import { useMutation } from "convex/react";
+import { PromptHelper } from "./PromptHelper";
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -444,6 +445,10 @@ export const PromptGenerator = ({
                                     placeholder="Describe the image style you want to create... e.g., 'moody neon-lit alley at night with rain reflections'"
                                     className="w-full h-32 px-4 py-3 bg-black border-2 border-white text-white placeholder-white/30 resize-none focus:outline-none focus:border-white/80"
                                     disabled={isLoading}
+                                />
+                                <PromptHelper
+                                    onSelect={(text) => setPromptText(text)}
+                                    className="mt-2"
                                 />
                             </div>
                         ) : (

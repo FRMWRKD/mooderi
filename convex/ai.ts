@@ -709,7 +709,7 @@ export const generateSmartBoard = action({
       board: {
         id: "temp-smart-" + Date.now(),
         name: args.prompt,
-        images: validImages.map((img) => img._id),
+        images: validImages.map((img) => img._id as Id<"images">),
         prompt: args.prompt,
         isSmartBoard: true,
       },

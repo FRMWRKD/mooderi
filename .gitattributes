@@ -1,0 +1,17 @@
+# Prevent Mac resource forks from being tracked
+._* -diff -merge -text
+.DS_Store -diff -merge -text
+
+# Ensure consistent line endings
+* text=auto
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+# Lock files
+package-lock.json -diff

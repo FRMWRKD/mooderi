@@ -1,3 +1,17 @@
+# Mac OS X Resource Forks (MUST BE FIRST - highest priority)
+._*
+.DS_Store
+**/.DS_Store
+**/._*
+
+# Archived/deprecated code (backed up externally)
+archive/
+legacy/
+clean-deploy/
+
+# Frontend build artifact (copied from root for Vercel)
+frontend/convex/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -59,10 +73,4 @@ frames/
 *.pem
 *.key
 .vercel
-
-# Mac OS X Resource Forks
-._*
-.DS_Store
-**/.DS_Store
-**/._*
 

@@ -144,7 +144,8 @@ export default function PricingPage() {
                                     {/* CTA Button */}
                                     {user ? (
                                         <CheckoutLink
-                                            product={pkg.key}
+                                            polarApi={api.payments as any}
+                                            productIds={[pkg.key]}
                                             className={`block w-full py-3 text-center font-bold uppercase tracking-wider text-sm transition-colors ${pkg.popular
                                                 ? "bg-white text-black hover:bg-white/90"
                                                 : "border-2 border-white hover:bg-white hover:text-black"
