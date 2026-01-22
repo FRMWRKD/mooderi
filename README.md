@@ -1,8 +1,46 @@
 # Mooderi: AI-Powered Prompt Library for Visual Creatives
 
-Mooderi is a searchable library of cinematic references and AI-generated prompts for visual creatives. Browse inspiring film stills, music video frames, and commercial imagery—then instantly copy ready-to-use prompts for Midjourney, Flux, Runway, and other AI image/video generators.
+> **Browse by IMAGE → Take away the PROMPT**
 
-**Core value proposition:** Browse images, take away prompts.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              HOW MOODERI WORKS                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────────┐   │
+│   │  BROWSE  │ ───► │  SELECT  │ ───► │   COPY   │ ───► │  USE PROMPT  │   │
+│   │  Images  │      │  Style   │      │  Prompt  │      │  in AI Tool  │   │
+│   └──────────┘      └──────────┘      └──────────┘      └──────────────┘   │
+│        │                 │                                     │           │
+│        │           Categories:                           Works with:       │
+│        │           • Cinematic                           • Midjourney      │
+│        ▼           • Editorial                           • Flux            │
+│   ┌──────────┐     • Fashion                             • SDXL            │
+│   │  UPLOAD  │     • Portrait                            • Runway          │
+│   │  Your    │     • Product                             • Leonardo        │
+│   │  Images  │     • Lifestyle                                             │
+│   └──────────┘     • Food                                                  │
+│                    • Architecture                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            TECHNICAL STACK                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   FRONTEND              BACKEND                 AI SERVICES                 │
+│   ┌──────────┐          ┌──────────┐            ┌──────────┐               │
+│   │ Next.js  │◄────────►│  Convex  │◄──────────►│ Visionati│ Image Analysis│
+│   │   14     │ WebSocket│ Real-time│            └──────────┘               │
+│   │ React 18 │          │ Database │            ┌──────────┐               │
+│   │ Tailwind │          │ + Auth   │◄──────────►│ Straico  │ Prompt Gen    │
+│   └──────────┘          └──────────┘            └──────────┘               │
+│                                                 ┌──────────┐               │
+│                                    ◄───────────►│  Modal   │ Video Process │
+│                                                 └──────────┘               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -183,67 +221,60 @@ npm run build && vercel deploy
 ## Project Structure
 
 ```
-moodboard-convex/
-├── convex/                    # Backend (Convex serverless functions)
-│   ├── convex.config.ts       # Convex configuration & components
-│   ├── auth.ts                # Authentication logic
-│   ├── images.ts              # Image data models & queries
+mooderi/
+├── convex/                    # BACKEND - Source of truth
+│   ├── schema.ts              # Database schema (single source)
+│   ├── ai.ts                  # AI pipeline (Visionati + Straico)
+│   ├── promptGenerator.ts     # Main prompt generation
+│   ├── rag.ts                 # Semantic search (vector embeddings)
+│   ├── images.ts              # Image queries & mutations
 │   ├── boards.ts              # Moodboard management
-│   ├── ai.ts                  # AI pipeline orchestration
-│   ├── promptCategories.ts    # Prompt style categories
-│   ├── promptAgent.ts         # RAG + prompt improvement
-│   ├── imageGeneration.ts     # Image upload & analysis
-│   ├── payments.ts            # Credit & payment logic
-│   ├── email.ts               # Email notifications (Resend)
-│   ├── http.ts                # External API integrations
-│   ├── notifications.ts       # User notifications
-│   ├── progressStore.ts       # Video processing progress
-│   └── _generated/            # Auto-generated (Convex)
+│   ├── users.ts               # User management
+│   ├── videos.ts              # Video processing (Modal)
+│   ├── payments.ts            # Credit system (Polar)
+│   ├── auth.ts                # Authentication (OAuth)
+│   └── _generated/            # Auto-generated types
 │
-├── frontend/                  # Next.js React application
-│   ├── public/                # Static assets
+├── frontend/                  # FRONTEND - Next.js 14
 │   ├── src/
-│   │   ├── app/               # Next.js pages & layouts
-│   │   │   ├── page.tsx       # Home / library browse
-│   │   │   ├── image/         # Image detail view
-│   │   │   ├── videos/        # Video processing
+│   │   ├── app/               # Pages (App Router)
+│   │   │   ├── page.tsx       # Home / browse library
+│   │   │   ├── image/[id]/    # Image detail + prompt copy
 │   │   │   ├── my-images/     # User uploads
-│   │   │   ├── search/        # Advanced search
-│   │   │   ├── folder/        # Moodboard view
-│   │   │   ├── chat/          # AI chat interface
-│   │   │   ├── tools/         # Utility tools
-│   │   │   │   └── prompt-generator/
-│   │   │   ├── settings/      # User settings
-│   │   │   ├── pricing/       # Pricing page
-│   │   │   └── login/         # Auth pages
-│   │   ├── components/        # React components
-│   │   │   ├── ui/            # Base UI components
-│   │   │   ├── features/      # Feature components
-│   │   │   └── layout/        # Layout components
-│   │   ├── hooks/             # Custom React hooks
-│   │   ├── lib/               # Utilities & helpers
-│   │   └── styles/            # Global styles
-│   ├── next.config.js         # Next.js configuration
-│   ├── tailwind.config.js     # TailwindCSS config
-│   ├── tsconfig.json          # TypeScript config
+│   │   │   ├── videos/        # Video processing
+│   │   │   ├── search/        # Search results
+│   │   │   ├── folder/[id]/   # Moodboard view
+│   │   │   ├── tools/         # Prompt builder
+│   │   │   └── pricing/       # Credits & pricing
+│   │   └── components/
+│   │       ├── features/      # Feature components
+│   │       ├── ui/            # Base UI (shadcn-style)
+│   │       └── layout/        # Layout components
+│   ├── next.config.js         # Build config (handles Convex copy)
 │   └── package.json
 │
-├── docs/                      # Documentation
-│   ├── DEPLOYMENT_STATUS.md   # Deployment info
-│   └── PROMPT_SYSTEM.md       # Prompt generation system
+├── scripts/                   # UTILITIES - Active scripts only
+│   ├── convex/                # Convex-related scripts
+│   ├── tests/                 # Test scripts
+│   └── utilities/             # Helper scripts
 │
-├── scripts/                   # Utility scripts
-│   └── [utility scripts]
+├── docs/                      # DOCUMENTATION
+│   ├── architecture/          # System design docs
+│   ├── guides/                # How-to guides
+│   └── reference/             # API & package docs
 │
-├── .env                       # Environment variables (git-ignored)
-├── .env.local                 # Local overrides (git-ignored)
-├── .gitignore                 # Git ignore rules
-├── convex.json                # Convex deployment config
-├── package.json               # Root dependencies
-├── SCHEMA.md                  # Database schema docs
-├── Overview.md                # Project overview
-└── README.md                  # This file
+├── .archive/                  # HIDDEN - Legacy code backup
+│   ├── backend/               # Old Express.js (not used)
+│   ├── flask_backend/         # Old Flask app (not used)
+│   ├── supabase/              # Old Supabase SQL (not used)
+│   └── scripts/               # Old Python scripts (not used)
+│
+├── README.md                  # START HERE
+├── HANDOVER.md                # Developer testing guide
+└── package.json               # Root dependencies
 ```
+
+**Important:** The `.archive/` folder contains old code from previous iterations (Flask, Express, Supabase). It's hidden by default and not needed for development. The current production stack is **Convex + Next.js**.
 
 ---
 
@@ -400,11 +431,11 @@ See `SCHEMA.md` for complete database design.
 
 ### Internal Docs
 
-- **`SCHEMA.md`** - Database schema design
-- **`Overview.md`** - Detailed project overview
-- **`docs/DEPLOYMENT_STATUS.md`** - Deployment checklist
-- **`docs/PROMPT_SYSTEM.md`** - AI prompt generation system
-- **`PACKAGE_UPDATES.md`** - Package version history
+- **`HANDOVER.md`** - Developer handover guide (start here for testing)
+- **`docs/architecture/OVERVIEW.md`** - System architecture
+- **`docs/architecture/PROMPT_SYSTEM.md`** - AI prompt generation system
+- **`docs/guides/DEPLOYMENT.md`** - Deployment checklist & troubleshooting
+- **`docs/reference/PACKAGE_UPDATES.md`** - Package version history
 
 ### External Resources
 
