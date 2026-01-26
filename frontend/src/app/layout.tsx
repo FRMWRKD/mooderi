@@ -7,6 +7,9 @@ import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// Force dynamic rendering to avoid static generation issues with Convex
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
     title: "MoodBoard - Visual Reference Library",
     description: "AI-powered moodboard creation from video content - v2.1.0",
