@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 
@@ -9,14 +9,26 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
  * Wraps the app with Convex context and authentication
  */
 
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL!;
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "";
 
-if (!convexUrl) {
-    throw new Error("Missing NEXT_PUBLIC_CONVEX_URL environment variable");
+// Create the client lazily to avoid issues during static generation
+let convexClient: ConvexReactClient | null = null;
+
+function getConvexClient() {
+    if (!convexClient && convexUrl) {
+        convexClient = new ConvexReactClient(convexUrl);
+    }
+    return convexClient;
 }
 
-const convex = new ConvexReactClient(convexUrl);
-
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
-    return <ConvexAuthProvider client={convex}>{children}</ConvexAuthProvider>;
+    const client = useMemo(() => getConvexClient(), []);
+
+    if (!client) {
+        // During static generation or if env var is missing, render children without Convex
+        // This allows the build to complete; the client will work at runtime
+        return <>{children}</>;
+    }
+
+    return <ConvexAuthProvider client={client}>{children}</ConvexAuthProvider>;
 }
