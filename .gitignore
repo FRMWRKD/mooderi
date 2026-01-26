@@ -10,7 +10,7 @@ legacy/
 clean-deploy/
 
 # Frontend build artifact (copied from root for Vercel)
-frontend/convex/
+# Note: frontend/convex/ must be tracked for Vercel deployment
 
 # Python
 __pycache__/
@@ -69,8 +69,16 @@ frames/
 *.avi
 *.mov
 
-# Secrets (extra safety)
+# Secrets (extra safety - NEVER commit these)
 *.pem
 *.key
+*.p12
+*.pfx
 .vercel
+temp_key.txt
+config.py
+**/credentials.json
+**/service-account*.json
+**/secrets.json
+**/secrets.yaml
 
