@@ -13,8 +13,13 @@
     },
     "dependencies": {
         "@auth/core": "^0.37.0",
+        "@convex-dev/action-retrier": "^0.3.0",
+        "@convex-dev/agent": "^0.3.2",
         "@convex-dev/auth": "^0.0.90",
         "@convex-dev/polar": "^0.7.3",
+        "@convex-dev/rag": "^0.6.1",
+        "@convex-dev/rate-limiter": "^0.3.2",
+        "@convex-dev/resend": "^0.2.3",
         "@polar-sh/checkout": "^0.2.0",
         "@radix-ui/react-dialog": "^1.0.5",
         "@radix-ui/react-dropdown-menu": "^2.0.6",
