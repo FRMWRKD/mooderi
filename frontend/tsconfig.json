@@ -26,7 +26,7 @@
                 "./src/*"
             ],
             "@convex/*": [
-                "../convex/*"
+                "./convex/*"
             ]
         }
     },
@@ -35,7 +35,7 @@
         "**/*.ts",
         "**/*.tsx",
         ".next/types/**/*.ts",
-        "../convex/**/*.ts"
+        "./convex/**/*.ts"
     ],
     "exclude": [
         "node_modules"
