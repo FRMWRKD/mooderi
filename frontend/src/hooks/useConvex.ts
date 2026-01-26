@@ -12,10 +12,9 @@
 
 import { useQuery, useMutation, useAction } from "convex/react";
 import { useState, useEffect } from "react";
-import { api } from "../../../convex/_generated/api";
-import { Id } from "../../../convex/_generated/dataModel";
+import { api } from "@convex/_generated/api";
+import { Id, Doc } from "@convex/_generated/dataModel";
 import { useAuth } from "@/contexts/AuthContext";
-import { Doc } from "../../../convex/_generated/dataModel";
 
 // ============================================
 // IMAGE HOOKS

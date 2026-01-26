@@ -3,7 +3,7 @@
 import { useQuery, useAction } from "convex/react";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { api } from "../../../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { Check, Sparkles, Zap, Crown, ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PolarEmbedCheckout } from "@polar-sh/checkout/embed";
