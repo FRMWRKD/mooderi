@@ -31,7 +31,7 @@ export const analyzeCategory = action({
     });
 
     const suggestions = feedback.filter(
-      (f) => f.type === "suggestion" && f.status === "approved"
+      (f: any) => f.type === "suggestion" && f.status === "approved"
     );
 
     if (suggestions.length === 0) {
@@ -64,7 +64,7 @@ ${systemPrompt.content}
 ---
 
 Community suggestions (approved by admin):
-${suggestions.map((s, i) => `${i + 1}. ${s.content}`).join("\n")}
+${suggestions.map((s: any, i: number) => `${i + 1}. ${s.content}`).join("\n")}
 
 Analyze these suggestions and propose specific improvements to the system prompt.
 Return JSON with:

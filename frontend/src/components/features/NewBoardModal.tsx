@@ -21,7 +21,7 @@ import { Id } from "@convex/_generated/dataModel";
 
 interface NewBoardModalProps {
     trigger?: React.ReactNode;
-    onBoardCreated?: (board: { name: string; description: string }) => void;
+    onBoardCreated?: (board: { id: string; name: string; description: string }) => void;
     imageIdToSave?: number;
 }
 
@@ -75,7 +75,7 @@ export function NewBoardModal({
                     }
                 }
 
-                onBoardCreated?.({ name: result.name, description: description });
+                onBoardCreated?.({ id: result.id, name: result.name, description: description });
                 setIsOpen(false);
                 setName("");
                 setDescription("");

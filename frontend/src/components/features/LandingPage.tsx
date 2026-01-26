@@ -249,7 +249,7 @@ function GeneratorModal({ onClose }: { onClose: () => void }) {
                         Try our AI for free! Analyze images or describe your vision.
                         <span className="text-white/40"> Batch processing available after sign in.</span>
                     </p>
-                    <PromptGenerator mode="landing" />
+                    <PromptGenerator mode="landing" displayMode="inline" />
                     <PublicRequestFeed />
                 </div>
             </motion.div>

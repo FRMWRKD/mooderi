@@ -34,18 +34,14 @@ export default function MyImagesPage() {
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-
-
-    const convexUser = useQuery(api.users.getBySupabaseId, user?.id ? { supabaseId: user.id } : "skip");
-
-    // Now use convexUser._id for filtering
-    const userImages = useQuery(api.images.filter, {
+    // Use user._id directly from auth context
+    const userImages = useQuery(api.images.filter, user?._id ? {
         limit: 100,
         sort: sortBy === "oldest" ? "oldest" : "newest", // Simplified sort
         sourceType: filterBy === "all" ? undefined : filterBy,
-        userId: convexUser?._id,
+        userId: user._id,
         onlyPublic: false, // Show private images too
-    });
+    } : "skip");
 
     const isLoading = userImages === undefined;
     const images = userImages?.images || [];

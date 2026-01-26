@@ -28,6 +28,7 @@ import type * as promptGenerator from "../promptGenerator.js";
 import type * as promptImprover from "../promptImprover.js";
 import type * as promptImproverActions from "../promptImproverActions.js";
 import type * as promptRequests from "../promptRequests.js";
+import type * as r2Storage from "../r2Storage.js";
 import type * as rag from "../rag.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as retrier from "../retrier.js";
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   promptImprover: typeof promptImprover;
   promptImproverActions: typeof promptImproverActions;
   promptRequests: typeof promptRequests;
+  r2Storage: typeof r2Storage;
   rag: typeof rag;
   rateLimits: typeof rateLimits;
   retrier: typeof retrier;

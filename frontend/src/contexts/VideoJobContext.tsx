@@ -32,6 +32,7 @@ export interface VideoJob {
 interface VideoJobContextType {
     jobs: VideoJob[];
     addJob: (jobId: string, url: string) => void;
+    updateJobStatus: (jobId: string, status: VideoJob["status"], stage?: string) => void;
     removeJob: (jobId: string) => void;
     clearCompleted: () => void;
     hasActiveJobs: boolean;
@@ -185,6 +186,27 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
         setJobs(prev => prev.filter(j => j.id !== jobId));
     }, []);
 
+    const updateJobStatus = useCallback((jobId: string, status: VideoJob["status"], stage?: string) => {
+        // Clear timer if job is no longer processing
+        if (status !== "processing" && status !== "queued") {
+            const timer = progressTimersRef.current.get(jobId);
+            if (timer) {
+                clearInterval(timer);
+                progressTimersRef.current.delete(jobId);
+            }
+        }
+        setJobs(prev => prev.map(j => {
+            if (j.id !== jobId) return j;
+            return {
+                ...j,
+                status,
+                progress: status === "pending_approval" || status === "completed" ? 100 : j.progress,
+                stage: stage || (status === "pending_approval" ? "Ready for review!" : 
+                       status === "completed" ? "Complete!" : j.stage),
+            };
+        }));
+    }, []);
+
     const clearCompleted = useCallback(() => {
         setJobs(prev => prev.filter(j =>
             j.status !== "completed" && j.status !== "failed" && j.status !== "pending_approval"
@@ -203,6 +225,7 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
         <VideoJobContext.Provider value={{
             jobs,
             addJob,
+            updateJobStatus,
             removeJob,
             clearCompleted,
             hasActiveJobs,

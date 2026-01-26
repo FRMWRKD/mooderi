@@ -29,35 +29,12 @@ export function VideoProcessingQueue() {
     const [pendingVideoUrl, setPendingVideoUrl] = useState("");
     const [autoOpenedJobs, setAutoOpenedJobs] = useState<Set<string>>(new Set());
 
-    // AUTO-OPEN modal when job reaches pending_approval
-    useEffect(() => {
-        const pendingJob = jobs.find(j =>
-            j.status === "pending_approval" &&
-            !autoOpenedJobs.has(j.id) &&
-            !showFrameModal
-        );
-
-        if (pendingJob) {
-            console.log("[VideoQueue] Auto-opening frame modal for job:", pendingJob.id);
-            // Mark as auto-opened to prevent reopening
-            setAutoOpenedJobs(prev => new Set([...Array.from(prev), pendingJob.id]));
-            // Trigger review click
-            (async () => {
-                try {
-                    const frames = await convex.query(api.videos.getFrames, { videoId: pendingJob.id as any });
-                    if (frames && frames.length > 0) {
-                        const frameUrls = frames.map(f => f.imageUrl);
-                        setPendingFrames(frameUrls);
-                        setPendingVideoUrl(pendingJob.url);
-                        setSelectedJobId(pendingJob.id);
-                        setShowFrameModal(true);
-                    }
-                } catch (e) {
-                    console.error("Auto-open failed:", e);
-                }
-            })();
-        }
-    }, [jobs, autoOpenedJobs, showFrameModal, convex]);
+    // NOTE: Auto-open disabled - TopBar handles frame selection modal
+    // The VideoProcessingQueue is now just for displaying job status
+    // useEffect(() => {
+    //     const pendingJob = jobs.find(j => ...);
+    //     ...
+    // }, [jobs, autoOpenedJobs, showFrameModal, convex]);
 
     const handleReviewClick = async (job: VideoJob) => {
         if (job.status !== "pending_approval") return;
@@ -87,22 +64,25 @@ export function VideoProcessingQueue() {
         setIsAdding(true);
         try {
             // 1. Create video record in Convex
+            console.log("[VideoQueue] Creating video record for:", newUrl);
             const result = await createVideo({ url: newUrl, qualityMode: quality });
+            console.log("[VideoQueue] Create result:", result);
+            
             if (result.success && result.id) {
                 // 2. Add to local queue context (for tracking)
                 const videoId = result.id;
                 addJob(videoId, newUrl);
+                console.log("[VideoQueue] Added job, triggering analyze for:", videoId);
 
                 // 3. Trigger Modal analysis via Action
-                // Note: We don't await this fully if we want UI to be responsive, 
-                // but analyze action typically waits for response. 
-                // However, since we added the job to queue, polling will pick up updates.
                 try {
-                    await analyzeVideo({ videoId: videoId, videoUrl: newUrl, qualityMode: quality });
-                } catch (err) {
-                    console.error("Analysis trigger failed:", err);
-                    // Job will stay in queued state or fail?
-                    // We might want to removeJob if this fails.
+                    console.log("[VideoQueue] Calling analyzeVideo action...");
+                    const analyzeResult = await analyzeVideo({ videoId: videoId, videoUrl: newUrl, qualityMode: quality });
+                    console.log("[VideoQueue] Analyze result:", analyzeResult);
+                } catch (err: any) {
+                    console.error("[VideoQueue] Analysis trigger failed:", err);
+                    // Show error to user
+                    alert(`Video analysis failed to start: ${err.message || err}`);
                 }
 
                 setNewUrl("");
@@ -110,9 +90,9 @@ export function VideoProcessingQueue() {
             } else {
                 alert("Failed to create video record");
             }
-        } catch (e) {
-            console.error(e);
-            alert("Failed to add video");
+        } catch (e: any) {
+            console.error("[VideoQueue] Error:", e);
+            alert(`Failed to add video: ${e.message || e}`);
         } finally {
             setIsAdding(false);
         }
@@ -270,8 +250,8 @@ export function VideoProcessingQueue() {
                 </div>
             )}
 
-            {/* Frame Selection Modal */}
-            <FrameSelectionModal
+            {/* Frame Selection Modal - DISABLED: TopBar handles this now */}
+            {/* <FrameSelectionModal
                 isOpen={showFrameModal}
                 onClose={() => setShowFrameModal(false)}
                 jobId={selectedJobId || ""}
@@ -282,7 +262,7 @@ export function VideoProcessingQueue() {
                     setPendingFrames([]);
                     setSelectedJobId(null);
                 }}
-            />
+            /> */}
         </div>
     );
 }

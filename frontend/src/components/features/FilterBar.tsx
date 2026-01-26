@@ -215,6 +215,15 @@ export function FilterBar({
     const [query, setQuery] = useState(initialQuery);
     const [searchType, setSearchType] = useState<"text" | "semantic">(initialType);
 
+    // Sync internal state when initial props change (e.g., from URL navigation)
+    useEffect(() => {
+        setQuery(initialQuery);
+    }, [initialQuery]);
+
+    useEffect(() => {
+        setSearchType(initialType);
+    }, [initialType]);
+
     // Filter State - now arrays for multi-select
     const [selectedMoods, setSelectedMoods] = useState<string[]>(initialMoods);
     const [selectedColors, setSelectedColors] = useState<string[]>(initialColors);

@@ -192,11 +192,11 @@ export const analyzeImage = action({
     });
     
     if (!ok) {
-      console.log(`[analyzeImage] Rate limited. Retry after ${retryAfter}ms`);
+      // Debug: [analyzeImage] Rate limited. Retry after ${retryAfter}ms`);
       throw new Error(`Rate limit exceeded. Please wait ${Math.ceil((retryAfter || 60000) / 1000)} seconds.`);
     }
 
-    console.log(`[analyzeImage] Starting analysis for imageId=${args.imageId}`);
+    // Debug: [analyzeImage] Starting analysis for imageId=${args.imageId}`);
 
     // ============================================
     // STEP 1: Call Visionati for image analysis
@@ -215,7 +215,7 @@ export const analyzeImage = action({
       url: args.imageUrl,
     };
 
-    console.log("[analyzeImage] Step 1: Calling Visionati...");
+    // Debug: [analyzeImage] Step 1: Calling Visionati...");
     const visionatiResponse = await fetchWithRetry('https://api.visionati.com/api/fetch', {
       method: 'POST',
       headers: {
@@ -234,7 +234,7 @@ export const analyzeImage = action({
 
     // Handle Async Polling
     if (visionatiResult.response_uri) {
-      console.log("[analyzeImage] Async response received. Polling...");
+      // Debug: [analyzeImage] Async response received. Polling...");
       const pollUrl = visionatiResult.response_uri;
       let attempts = 0;
       const maxAttempts = 60; // 60 * 2s = 120s timeout
@@ -249,12 +249,12 @@ export const analyzeImage = action({
 
         if (pollResp.ok) {
           const pollResult = await pollResp.json();
-          console.log(`[analyzeImage] Poll attempt ${attempts + 1}/${maxAttempts}`);
+          // Debug: [analyzeImage] Poll attempt ${attempts + 1}/${maxAttempts}`);
 
           if (pollResult.all && pollResult.all.assets) {
             visionatiResult = pollResult;
             pollingSuccess = true;
-            console.log("[analyzeImage] Polling complete - assets received");
+            // Debug: [analyzeImage] Polling complete - assets received");
             break;
           }
           if (pollResult.status === 'failed') {
@@ -286,14 +286,31 @@ export const analyzeImage = action({
       }
 
       const colorData = asset.colors || allData.colors || {};
-      colors = Object.keys(colorData).slice(0, 5);
+      // Handle new Visionati API format where colors is an object with dominant array
+      if (colorData.dominant && Array.isArray(colorData.dominant)) {
+        colors = colorData.dominant.slice(0, 5);
+      } else if (typeof colorData === 'object' && !Array.isArray(colorData)) {
+        colors = Object.keys(colorData).slice(0, 5);
+      } else if (Array.isArray(colorData)) {
+        colors = colorData.slice(0, 5);
+      }
 
       const tagData = asset.tags || allData.tags || {};
       tags = Object.keys(tagData).slice(0, 10);
     } else {
       const desc = allData.descriptions || [];
       visionatiDescription = desc.length > 0 ? desc[0].description : '';
-      colors = Object.keys(allData.colors || {}).slice(0, 5);
+      
+      const colorData = allData.colors || {};
+      // Handle new Visionati API format where colors is an object with dominant array
+      if (colorData.dominant && Array.isArray(colorData.dominant)) {
+        colors = colorData.dominant.slice(0, 5);
+      } else if (typeof colorData === 'object' && !Array.isArray(colorData)) {
+        colors = Object.keys(colorData).slice(0, 5);
+      } else if (Array.isArray(colorData)) {
+        colors = colorData.slice(0, 5);
+      }
+      
       tags = Object.keys(allData.tags || {}).slice(0, 10);
     }
 
@@ -308,19 +325,14 @@ export const analyzeImage = action({
         const jsonMatch = cleanedPrompt.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           structuredAnalysis = JSON.parse(jsonMatch[0]);
-          console.log("[analyzeImage] Parsed structured analysis");
+          // Debug: [analyzeImage] Parsed structured analysis");
         }
       } catch (e) {
-        console.log("[analyzeImage] Could not parse JSON from Visionati response");
+        // Debug: [analyzeImage] Could not parse JSON from Visionati response");
       }
     }
 
-    console.log("[analyzeImage] Visionati complete:", {
-      hasStructured: !!structuredAnalysis,
-      descriptionLen: visionatiDescription.length,
-      colors: colors.length,
-      tags: tags.length,
-    });
+    // Visionati complete
 
     // ============================================
     // STEP 2: Generate embedding for semantic search
@@ -329,7 +341,7 @@ export const analyzeImage = action({
 
     if (visionatiDescription && googleApiKey) {
       try {
-        console.log("[analyzeImage] Step 2: Generating embedding...");
+        // Debug: [analyzeImage] Step 2: Generating embedding...");
         const embeddingResponse = await fetchWithRetry(
           `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
           {
@@ -345,7 +357,7 @@ export const analyzeImage = action({
         if (embeddingResponse.ok) {
           const embeddingData = await embeddingResponse.json();
           embedding = embeddingData.embedding?.values || null;
-          console.log("[analyzeImage] Embedding generated:", embedding ? `${embedding.length} dimensions` : 'failed');
+          // Debug: [analyzeImage] Embedding generated:", embedding ? `${embedding.length} dimensions` : 'failed');
         } else {
           console.error("[analyzeImage] Embedding API error:", embeddingResponse.status);
         }
@@ -363,18 +375,18 @@ export const analyzeImage = action({
 
     if (straicoKey) {
       try {
-        console.log("[analyzeImage] Step 3: Calling Straico...");
+        // Debug: [analyzeImage] Step 3: Calling Straico...");
 
         // Auto-detect category from Visionati analysis
         detectedCategory = detectCategoryFromAnalysis(tags, structuredAnalysis, colors);
-        console.log(`[analyzeImage] Auto-detected category: ${detectedCategory}`);
+        // Debug: [analyzeImage] Auto-detected category: ${detectedCategory}`);
 
         // Try to load category-specific system prompt
         let systemPrompt = await getSystemPrompt(ctx, `category_${detectedCategory}_v1`);
         
         // Fallback to generic if category prompt not found
         if (!systemPrompt) {
-          console.log(`[analyzeImage] No category-specific prompt for ${detectedCategory}, using generic`);
+          // Debug: [analyzeImage] No category-specific prompt for ${detectedCategory}, using generic`);
           systemPrompt = await getSystemPrompt(ctx, 'straico_v1');
         }
         
@@ -390,9 +402,9 @@ export const analyzeImage = action({
             categoryKey: detectedCategory,
             limit: 3,
           });
-          console.log(`[analyzeImage] Loaded ${categoryExamples.length} top examples for ${detectedCategory}`);
+          // Debug: [analyzeImage] Loaded ${categoryExamples.length} top examples for ${detectedCategory}`);
         } catch (e) {
-          console.log("[analyzeImage] Could not load category examples:", e);
+          // Debug: [analyzeImage] Could not load category examples:", e);
         }
 
         const inputData = {
@@ -459,12 +471,22 @@ export const analyzeImage = action({
 
               const jsonStart = content.indexOf('{');
               const jsonEnd = content.lastIndexOf('}');
-              if (jsonStart !== -1 && jsonEnd !== -1) {
-                content = content.substring(jsonStart, jsonEnd + 1);
+              
+              if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+                // Found JSON - parse it
+                const jsonContent = content.substring(jsonStart, jsonEnd + 1);
+                straicoPrompts = JSON.parse(jsonContent);
+                // Debug: [analyzeImage] Straico prompts parsed:", Object.keys(straicoPrompts));
+              } else {
+                // No JSON found - Straico returned plain text prompt
+                // Use the entire content as the text_to_image prompt
+                // Debug: [analyzeImage] Straico returned plain text, using as prompt");
+                straicoPrompts = {
+                  text_to_image: content.substring(0, 2000), // Limit length
+                  image_to_image: content.substring(0, 2000),
+                  text_to_video: content.substring(0, 1000),
+                };
               }
-
-              straicoPrompts = JSON.parse(content);
-              console.log("[analyzeImage] Straico prompts parsed:", Object.keys(straicoPrompts));
 
               // Include Visionati analysis in prompts
               if (structuredAnalysis) {
@@ -478,6 +500,16 @@ export const analyzeImage = action({
             }
           } catch (parseError) {
             console.error("[analyzeImage] Straico parse error:", parseError);
+            // Fallback: use Visionati description as prompt
+            if (visionatiDescription) {
+              straicoPrompts = {
+                text_to_image: structuredAnalysis?.short_description || visionatiDescription.substring(0, 500),
+                visionati_analysis: visionatiDescription,
+                structured_analysis: structuredAnalysis,
+              };
+              finalPrompt = straicoPrompts.text_to_image;
+              // Debug: [analyzeImage] Using Visionati fallback for prompts");
+            }
           }
         } else {
           console.error("[analyzeImage] Straico API error:", straicoRes.status);
@@ -490,7 +522,7 @@ export const analyzeImage = action({
     // ============================================
     // STEP 4: Update database with all data
     // ============================================
-    console.log("[analyzeImage] Step 4: Updating database...");
+    // Debug: [analyzeImage] Step 4: Updating database...");
 
     const updatePayload: any = {
       id: args.imageId,
@@ -543,18 +575,18 @@ export const analyzeImage = action({
     // STEP 5: Index prompt into RAG for semantic search
     // ============================================
     try {
-      console.log("[analyzeImage] Step 5: Indexing prompt into RAG...");
+      // Debug: [analyzeImage] Step 5: Indexing prompt into RAG...");
       const ragResult = await ctx.runAction(api.rag.indexPrompt, {
         imageId: args.imageId,
         forceReindex: true,
       });
-      console.log("[analyzeImage] RAG indexing result:", ragResult);
+      // Debug: [analyzeImage] RAG indexing result:", ragResult);
     } catch (ragError) {
       // Don't fail the entire pipeline if RAG indexing fails
       console.error("[analyzeImage] RAG indexing failed (non-fatal):", ragError);
     }
 
-    console.log("[analyzeImage] Pipeline complete!");
+    // Debug: [analyzeImage] Pipeline complete!");
 
     return {
       success: true,

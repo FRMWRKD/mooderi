@@ -271,13 +271,14 @@ function calculateRankingScore(vectorScore: number, metadata?: any): number {
 
 /**
  * Find similar prompts to a given image
+ * Filters out deleted images and returns fresh image data
  */
 export const findSimilarPrompts = action({
   args: {
     imageId: v.id("images"),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const image = await ctx.runQuery(api.images.getById, { id: args.imageId });
     if (!image) throw new Error("Image not found");
 
@@ -287,30 +288,49 @@ export const findSimilarPrompts = action({
     }
 
     // Search for similar prompts, excluding the current image
+    // Get extra results to account for deleted images
     const { results, entries } = await rag.search(ctx, {
       namespace: "prompts",
       query: prompt,
-      limit: (args.limit ?? 5) + 1, // Get one extra to filter out self
+      limit: (args.limit ?? 5) * 3, // Get extra to filter out deleted
       vectorScoreThreshold: 0.6, // Higher threshold for similarity
     });
 
-    // Filter out the current image and enrich results
-    const similarPrompts = entries
-      .filter((entry) => entry.metadata?.imageId !== args.imageId)
-      .slice(0, args.limit ?? 5)
-      .map((entry) => ({
-        entryId: entry.entryId,
-        imageId: entry.metadata?.imageId,
-        imageUrl: entry.metadata?.imageUrl,
-        promptText: entry.text,
-        mood: entry.metadata?.mood,
-        lighting: entry.metadata?.lighting,
-        score: results.find((r) => r.entryId === entry.entryId)?.score ?? 0,
-      }));
+    // Filter out the current image
+    const candidateEntries = entries
+      .filter((entry) => entry.metadata?.imageId !== args.imageId);
+
+    // Verify each image still exists and get fresh data
+    const validPrompts = [];
+    for (const entry of candidateEntries) {
+      if (validPrompts.length >= (args.limit ?? 5)) break;
+      
+      const imageId = entry.metadata?.imageId as string | undefined;
+      if (!imageId) continue;
+
+      // Check if the image still exists
+      try {
+        const existingImage = await ctx.runQuery(api.images.getById, { id: imageId as any });
+        if (existingImage) {
+          validPrompts.push({
+            entryId: entry.entryId,
+            imageId: existingImage._id,
+            imageUrl: existingImage.imageUrl, // Use fresh URL from database
+            promptText: entry.text,
+            mood: existingImage.mood || entry.metadata?.mood,
+            lighting: existingImage.lighting || entry.metadata?.lighting,
+            score: results.find((r) => r.entryId === entry.entryId)?.score ?? 0,
+          });
+        }
+      } catch {
+        // Image doesn't exist, skip it
+        continue;
+      }
+    }
 
     return {
       success: true,
-      results: similarPrompts,
+      results: validPrompts,
     };
   },
 });

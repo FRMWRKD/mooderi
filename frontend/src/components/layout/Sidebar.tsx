@@ -43,12 +43,30 @@ export function Sidebar() {
     const { user, signOut, isLoading: isAuthLoading } = useAuth();
 
     // Convex queries - reactive updates
-    const boards = useQuery(api.boards.list, {});
-    // We can filter parent_id locally or add args to list query
-    const topLevelBoards = boards?.filter(b => !b.parentId) || [];
-    const isLoadingBoards = boards === undefined;
+    // Get user's own boards
+    const userBoards = useQuery(api.boards.list, {});
+    // Get public boards from all users
+    const publicBoards = useQuery(api.boards.list, { includePublic: true });
+    
+    // Merge user's boards with public boards (avoiding duplicates)
+    const allBoards = (() => {
+        if (!userBoards && !publicBoards) return undefined;
+        const boards = [...(userBoards || [])];
+        const userBoardIds = new Set(boards.map(b => b._id));
+        // Add public boards that aren't already in user's boards
+        for (const pb of (publicBoards || [])) {
+            if (!userBoardIds.has(pb._id)) {
+                boards.push(pb);
+            }
+        }
+        return boards;
+    })();
+    
+    // We can filter parent_id locally
+    const topLevelBoards = allBoards?.filter(b => !b.parentId) || [];
+    const isLoadingBoards = allBoards === undefined;
 
-    const handleNewFolder = async (boardData: { name: string; description: string }) => {
+    const handleNewFolder = async (boardData: { id: string; name: string; description: string }) => {
         // No manual refresh needed with Convex!
     };
 

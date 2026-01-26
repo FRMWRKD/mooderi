@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { AppShell } from "@/components/layout";
 import { RequireAuth, useAuth } from "@/contexts/AuthContext";
-import { ImageCard } from "@/components/features";
+import { ImageCard, UploadModal } from "@/components/features";
 import {
     Send,
     ImageIcon,
@@ -64,6 +64,8 @@ function ChatContent() {
     // Actions
     const generateSinglePrompt = useAction(api.promptAgent.generateImagePrompt);
     const generateMultiPrompt = useAction(api.promptAgent.generateMultiImagePrompt);
+    const clearChatHistory = useMutation(api.promptAgent.clearChatHistory);
+    const copyPromptMutation = useMutation(api.promptAgent.copyPromptFromChat);
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -116,11 +118,34 @@ function ChatContent() {
         }
     };
 
-    // Copy to clipboard
-    const handleCopy = (content: string, id: string) => {
-        navigator.clipboard.writeText(content);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
+    // Copy to clipboard (charges 1 credit)
+    const handleCopy = async (content: string, id: string) => {
+        if (!userId) return;
+
+        try {
+            const result = await copyPromptMutation({ userId, messageId: id as Id<"agentMessages"> });
+            if (!result.success) {
+                setError(result.error || "Failed to copy");
+                return;
+            }
+            navigator.clipboard.writeText(content);
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        } catch (err: any) {
+            setError(err.message || "Failed to copy prompt");
+        }
+    };
+
+    // Clear chat history (TC-10: New Conversation)
+    const handleClearHistory = async () => {
+        if (!userId) return;
+        if (!confirm("Clear all chat history? This cannot be undone.")) return;
+
+        try {
+            await clearChatHistory({ userId });
+        } catch (err) {
+            console.error("Failed to clear history:", err);
+        }
     };
 
     // Format time
@@ -145,9 +170,21 @@ function ChatContent() {
                             Select images to generate detailed AI prompts
                         </p>
                     </div>
-                    <div className="text-right">
-                        <div className="text-sm text-white/60">Credits</div>
-                        <div className="text-xl font-bold">{userCredits}</div>
+                    <div className="flex items-center gap-4">
+                        {chatHistory && chatHistory.length > 0 && (
+                            <Button
+                                onClick={handleClearHistory}
+                                variant="ghost"
+                                className="text-white/60 hover:text-white text-sm uppercase tracking-widest flex items-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Clear
+                            </Button>
+                        )}
+                        <div className="text-right">
+                            <div className="text-sm text-white/60">Credits</div>
+                            <div className="text-xl font-bold">{userCredits}</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -255,9 +292,25 @@ function ChatContent() {
                                 <span className="text-sm uppercase tracking-widest">
                                     Select Images ({selectedImages.length}/5)
                                 </span>
-                                <button onClick={() => setShowImagePicker(false)}>
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <UploadModal
+                                        trigger={
+                                            <Button variant="ghost" className="text-sm uppercase tracking-widest flex items-center gap-2">
+                                                <Upload className="w-4 h-4" />
+                                                Upload
+                                            </Button>
+                                        }
+                                        onImageUploaded={(imageId) => {
+                                            // Auto-select the newly uploaded image
+                                            if (selectedImages.length < 5) {
+                                                setSelectedImages(prev => [...prev, imageId as Id<"images">]);
+                                            }
+                                        }}
+                                    />
+                                    <button onClick={() => setShowImagePicker(false)}>
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="p-4 overflow-y-auto max-h-[60vh]">
@@ -288,10 +341,20 @@ function ChatContent() {
                                 ) : (
                                     <div className="text-center py-12 text-white/60">
                                         <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                                        <p>No images in your library</p>
-                                        <a href="/my-images" className="text-white underline text-sm">
-                                            Upload some images first
-                                        </a>
+                                        <p className="mb-4">No images in your library</p>
+                                        <UploadModal
+                                            trigger={
+                                                <Button variant="default" className="bg-white text-black hover:bg-white/90">
+                                                    <Upload className="w-4 h-4 mr-2" />
+                                                    Upload Image
+                                                </Button>
+                                            }
+                                            onImageUploaded={(imageId) => {
+                                                if (selectedImages.length < 5) {
+                                                    setSelectedImages(prev => [...prev, imageId as Id<"images">]);
+                                                }
+                                            }}
+                                        />
                                     </div>
                                 )}
                             </div>

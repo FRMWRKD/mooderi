@@ -83,7 +83,8 @@ interface PromptCategory {
 }
 
 interface PromptGeneratorProps {
-    userId?: string;
+    userId?: Id<"users">;
+    userCredits?: number;
     mode?: "landing" | "app";
     displayMode?: "modal" | "inline";
     initialInputMode?: "text" | "image";
@@ -122,6 +123,7 @@ function getClientKey(): string {
 // ============================================
 export const PromptGenerator = ({
     userId,
+    userCredits,
     mode = "landing",
     displayMode = "modal",
     initialInputMode = "text",
@@ -244,6 +246,15 @@ export const PromptGenerator = ({
             return;
         }
 
+        // Frontend credits check for app mode
+        if (mode === "app" && userCredits !== undefined) {
+            const creditsNeeded = inputMode === "image" ? 2 : 1;
+            if (userCredits < creditsNeeded) {
+                setError(`Not enough credits. You need ${creditsNeeded} credits but you have ${userCredits}. Please purchase more credits.`);
+                return;
+            }
+        }
+
         setIsLoading(true);
         setError(null);
         setResult(null);
@@ -262,7 +273,7 @@ export const PromptGenerator = ({
                 categoryKey: selectedCategory || undefined,
                 source: mode,
                 clientKey: clientKey,
-                userId: userId as any,
+                userId: userId,
             });
 
             if (!response.success && response.rateLimitInfo?.retryAfterSeconds) {
@@ -341,14 +352,20 @@ export const PromptGenerator = ({
         <div className={`w-full max-w-4xl mx-auto space-y-6 ${displayMode === 'modal' ? '' : 'py-8'}`}>
             {/* Header (Only for Modal) */}
             {displayMode === "modal" && (
-                <div className="flex items-center justify-between border-b border-white/10 pb-6">
+                <div className="flex items-center justify-between border-b border-white/10 pb-6 relative z-[60]">
                     <div className="flex items-center gap-3">
                         <Sparkles className="w-5 h-5" />
                         <h2 className="text-lg font-bold tracking-widest uppercase">AI Prompt Generator</h2>
                     </div>
                     <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+                        type="button"
+                        aria-label="Close"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -517,9 +534,17 @@ export const PromptGenerator = ({
                         {error && (
                             <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-500/50 text-red-400 text-sm">
                                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                <span>{error}</span>
+                                <span className="flex-1">{error}</span>
                                 {rateLimitCountdown && (
-                                    <span className="ml-auto font-mono">{rateLimitCountdown}s</span>
+                                    <span className="font-mono">{rateLimitCountdown}s</span>
+                                )}
+                                {error.toLowerCase().includes('credit') && (
+                                    <a 
+                                        href="/pricing" 
+                                        className="ml-2 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold uppercase tracking-wider rounded hover:opacity-90 transition-opacity"
+                                    >
+                                        Get Credits
+                                    </a>
                                 )}
                             </div>
                         )}

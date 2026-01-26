@@ -7,7 +7,7 @@ import { generateWithGoogle, generateWithFal, testApiKey } from "./imageGenerati
 
 /**
  * HTTP Endpoints
- * For external webhook integrations (Modal, Polar, etc.) and Auth
+ * For external webhook integrations (Modal, Polar, etc.), Auth, and R2 uploads
  */
 
 const http = httpRouter();
@@ -15,21 +15,230 @@ const http = httpRouter();
 // Convex Auth routes (OAuth callbacks, etc.)
 auth.addHttpRoutes(http);
 
+// ============================================
+// R2 STORAGE UPLOAD ENDPOINT
+// ============================================
+
+/**
+ * Get presigned URL for R2 upload
+ * POST /r2/upload-url
+ * Body: { contentType: string, prefix?: string }
+ */
+http.route({
+  path: "/r2/upload-url",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      // Verify authentication
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      }
+
+      const body = await request.json();
+      const { contentType, prefix } = body;
+
+      if (!contentType) {
+        return new Response(JSON.stringify({ error: "contentType is required" }), {
+          status: 400,
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      }
+
+      // Generate presigned URL
+      const result = await ctx.runAction(api.r2Storage.generatePresignedUploadUrl, {
+        contentType,
+        prefix,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    } catch (e: any) {
+      console.error("[R2 Upload URL] Error:", e);
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 500,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    }
+  }),
+});
+
+/**
+ * CORS preflight for R2 upload endpoint
+ */
+http.route({
+  path: "/r2/upload-url",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }),
+});
+
 // Polar webhook routes (payment events)
 // Endpoint: /polar/events
 // Type cast needed due to @convex-dev/polar router type mismatch with httpRouter
 polar.registerRoutes(http as any, {
   onSubscriptionCreated: async (ctx: any, event: any) => {
-    console.log("[Polar] Subscription created:", event.data.id);
     // Handle new subscription - could trigger welcome email, etc.
   },
   onSubscriptionUpdated: async (ctx: any, event: any) => {
-    console.log("[Polar] Subscription updated:", event.data.id, event.data.status);
     // Handle cancellation, renewal, etc.
-    if (event.data.customerCancellationReason) {
-      console.log("[Polar] Cancellation reason:", event.data.customerCancellationReason);
-    }
   },
+});
+
+// ============================================
+// POLAR CUSTOM WEBHOOK FOR ONE-TIME PAYMENTS
+// ============================================
+
+// Product ID to credits mapping (uses environment variables for production)
+const STARTER_PACK_ID = process.env.POLAR_STARTER_PACK_ID || "";
+const PRO_PACK_ID = process.env.POLAR_PRO_PACK_ID || "";
+
+const PRODUCT_CREDITS: Record<string, number> = {
+  ...(STARTER_PACK_ID && { [STARTER_PACK_ID]: 100 }),  // Starter Pack - 100 credits
+  ...(PRO_PACK_ID && { [PRO_PACK_ID]: 500 }),          // Pro Pack - 500 credits
+};
+
+/**
+ * Custom Polar webhook handler for one-time payments (order.paid)
+ * The @convex-dev/polar library only handles subscriptions, not one-time purchases
+ * POST /polar/order-webhook
+ */
+http.route({
+  path: "/polar/order-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+
+      // Handle checkout.created - payment initiated
+      if (body.type === "checkout.created") {
+        return new Response(JSON.stringify({ received: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Handle checkout.updated - payment completed
+      if (body.type === "checkout.updated" && body.data?.status === "succeeded") {
+        const checkout = body.data;
+        const userId = checkout.metadata?.userId;
+
+        // Try multiple paths to find productId - Polar's structure varies
+        let productId = checkout.productId
+          || checkout.product?.id
+          || checkout.products?.[0]?.productId
+          || checkout.products?.[0]?.id
+          || checkout.product_id;
+
+        if (!userId) {
+          console.error("[Polar Order Webhook] No userId in metadata");
+          return new Response(JSON.stringify({ error: "No userId in metadata" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Get credits for this product
+        const credits = PRODUCT_CREDITS[productId];
+        if (!credits) {
+          return new Response(JSON.stringify({ received: true, message: "Unknown product or subscription" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Add credits to user
+        await ctx.runMutation(internal.payments.addCredits, {
+          userId: userId as any,
+          credits,
+          productId,
+          orderId: checkout.id,
+        });
+
+        return new Response(JSON.stringify({ success: true, credits }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Handle order.paid event (alternative event type)
+      // Use checkout_id for idempotency so it matches checkout.updated events
+      if (body.type === "order.paid") {
+        const order = body.data;
+        const userId = order.metadata?.userId;
+        const productId = order.productId || order.product?.id;
+        // Use checkout_id as the idempotency key to match checkout.updated events
+        const checkoutId = order.checkout_id;
+
+        if (!userId) {
+          console.error("[Polar Order Webhook] No userId in order metadata");
+          return new Response(JSON.stringify({ error: "No userId in metadata" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const credits = PRODUCT_CREDITS[productId];
+        if (!credits) {
+          return new Response(JSON.stringify({ received: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Use checkoutId for idempotency (not order.id) so it matches checkout.updated
+        await ctx.runMutation(internal.payments.addCredits, {
+          userId: userId as any,
+          credits,
+          productId,
+          orderId: checkoutId || order.id,
+        });
+
+        return new Response(JSON.stringify({ success: true, credits }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Acknowledge other events
+      return new Response(JSON.stringify({ received: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (e: any) {
+      console.error("[Polar Order Webhook] Error:", e);
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }),
 });
 
 /**
@@ -42,9 +251,7 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     try {
       const body = await request.json();
-      
-      console.log("[Modal Webhook] Received:", body);
-      
+
       const { 
         job_id, 
         video_id, 

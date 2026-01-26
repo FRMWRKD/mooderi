@@ -50,6 +50,7 @@ export default function FolderPage({ params }: { params: { id: string } }) {
     const updateBoard = useMutation(api.boards.update);
     const deleteBoard = useMutation(api.boards.remove);
     const createSubfolder = useMutation(api.boards.create);
+    const removeImageFromBoard = useMutation(api.boards.removeImage);
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isNewSubfolderModalOpen, setIsNewSubfolderModalOpen] = useState(false);
@@ -136,6 +137,19 @@ export default function FolderPage({ params }: { params: { id: string } }) {
         }
 
         setIsSaving(false);
+    };
+
+    // Handle removing an image from this board
+    const handleRemoveImage = async (imageId: string) => {
+        try {
+            await removeImageFromBoard({
+                boardId: boardId,
+                imageId: imageId as Id<"images">,
+            });
+        } catch (error) {
+            console.error("Failed to remove image:", error);
+            alert("Failed to remove image from board");
+        }
     };
 
     // Initialize edit modal state when opening
@@ -282,6 +296,8 @@ export default function FolderPage({ params }: { params: { id: string } }) {
                                 imageUrl={image.imageUrl}
                                 mood={image.mood}
                                 colors={image.colors}
+                                boardId={boardId}
+                                onRemoveFromBoard={handleRemoveImage}
                             />
                         ))}
                     </div>

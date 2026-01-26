@@ -77,7 +77,8 @@ export default function PromptGeneratorPage() {
                             <PromptGenerator
                                 displayMode="inline"
                                 mode="app"
-                                userId={user?.id}
+                                userId={user?._id}
+                                userCredits={user?.credits}
                                 hideRecent={true}
                                 initialPrompt={selectedPrompt}
                             />

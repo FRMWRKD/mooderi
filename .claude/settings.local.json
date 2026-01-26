@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx convex env set:*)",
+      "Bash(npx convex:*)",
+      "Bash(findstr:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:polar.sh)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}

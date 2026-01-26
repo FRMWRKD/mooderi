@@ -1,7 +1,8 @@
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Images Module
@@ -13,6 +14,12 @@ import { api } from "./_generated/api";
  * - CRUD operations
  * - Visibility management
  */
+
+// Helper function to get current user ID from auth context
+async function getCurrentUserId(ctx: QueryCtx | MutationCtx): Promise<Id<"users"> | null> {
+  // Use the official helper from @convex-dev/auth
+  return await getAuthUserId(ctx);
+}
 
 // ============================================
 // QUERIES - Read operations
@@ -315,12 +322,13 @@ export const getRanked = query({
 
 /**
  * Create a new image
- * Migrated from: POST /api/images/analyze (partial)
+ * Supports both Convex Storage (storageId) and Cloudflare R2 (r2Key + imageUrl)
  */
 export const create = mutation({
   args: {
-    imageUrl: v.optional(v.string()), // Optional if storageId provided
-    storageId: v.optional(v.id("_storage")),
+    imageUrl: v.optional(v.string()), // Required for R2, optional for Convex Storage
+    storageId: v.optional(v.id("_storage")), // Convex Storage ID (legacy)
+    r2Key: v.optional(v.string()), // Cloudflare R2 file key (new)
     thumbnailUrl: v.optional(v.string()), // Optional thumbnail URL
     prompt: v.optional(v.string()),
     mood: v.optional(v.string()),
@@ -333,13 +341,20 @@ export const create = mutation({
     videoId: v.optional(v.id("videos")),
     frameNumber: v.optional(v.number()),
     userId: v.optional(v.id("users")),
-    signature: v.optional(v.string()), // SHA-256 or perceptual hash for deduplication - implement in frontend
+    signature: v.optional(v.string()), // SHA-256 or perceptual hash for deduplication
   },
   handler: async (ctx, args) => {
-    // Validate that we have either an image URL or a storage ID
-    if (!args.imageUrl && !args.storageId) {
-      throw new Error("Must provide either imageUrl or storageId");
+    // Validate that we have either an image URL, storage ID, or R2 key
+    if (!args.imageUrl && !args.storageId && !args.r2Key) {
+      throw new Error("Must provide imageUrl, storageId, or r2Key");
     }
+    
+    // Get current user ID from auth if not provided
+    let userId = args.userId;
+    if (!userId) {
+      userId = (await getCurrentUserId(ctx)) ?? undefined;
+    }
+    
     // Signature-based deduplication (frontend should generate & pass hash on upload)
     if (args.signature) {
       const existing = await ctx.db
@@ -354,16 +369,20 @@ export const create = mutation({
 
     let finalImageUrl = args.imageUrl;
     let finalStorageId = args.storageId;
+    let finalR2Key = args.r2Key;
 
-    // If storageId is provided, generate the public URL
-    if (args.storageId) {
+    // If storageId is provided (legacy Convex Storage), generate the public URL
+    if (args.storageId && !args.imageUrl) {
       finalImageUrl = (await ctx.storage.getUrl(args.storageId)) ?? "";
-      finalStorageId = args.storageId;
     }
+    
+    // For R2, imageUrl should already be provided by the frontend
+    // (the public URL from R2)
 
     return await ctx.db.insert("images", {
       imageUrl: finalImageUrl || "",
       storageId: finalStorageId,
+      r2Key: finalR2Key,
       thumbnailUrl: args.thumbnailUrl,
       prompt: args.prompt,
       mood: args.mood,
@@ -375,7 +394,7 @@ export const create = mutation({
       sourceVideoUrl: args.sourceVideoUrl,
       videoId: args.videoId,
       frameNumber: args.frameNumber,
-      userId: args.userId,
+      userId: userId,
       status: "pending",
       likes: 0,
       dislikes: 0,
@@ -463,6 +482,34 @@ export const bulkUpdateVisibility = mutation({
 });
 
 /**
+ * Get user's existing vote for an image
+ * TC-8: Persists on page reload
+ */
+export const getUserVote = query({
+  args: {
+    imageId: v.id("images"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return null;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const existingVote = await ctx.db
+      .query("userActions")
+      .withIndex("by_user_and_image", (q) => q.eq("userId", user._id).eq("imageId", args.imageId))
+      .filter((q) => q.or(
+        q.eq(q.field("actionType"), "like"),
+        q.eq(q.field("actionType"), "dislike")
+      ))
+      .first();
+
+    return existingVote?.actionType || null;
+  },
+});
+
+/**
  * Like or dislike an image
  * Migrated from: POST /api/images/:id/like, /dislike
  */
@@ -472,17 +519,13 @@ export const vote = mutation({
     voteType: v.union(v.literal("like"), v.literal("dislike")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) {
       throw new Error("You must be logged in to vote");
     }
 
     try {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email!))
-        .first();
-
+      const user = await ctx.db.get(userId);
       if (!user) throw new Error("User not found");
 
       const image = await ctx.db.get(args.imageId);
@@ -548,6 +591,66 @@ export const vote = mutation({
       console.error("Vote operation failed:", error);
       throw new Error(`Failed to process vote: ${error.message}`);
     }
+  },
+});
+
+/**
+ * Copy a prompt - deducts 1 credit and logs the action
+ * C-4: Credit Consumption requirement
+ */
+export const copyPrompt = mutation({
+  args: {
+    imageId: v.id("images"),
+  },
+  handler: async (ctx, args) => {
+    // Get authenticated user
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    // Check if image exists
+    const image = await ctx.db.get(args.imageId);
+    if (!image) {
+      return { success: false, error: "Image not found" };
+    }
+
+    // Check if user has enough credits
+    const currentCredits = user.credits ?? 0;
+    const creditCost = 1;
+
+    if (currentCredits < creditCost) {
+      return {
+        success: false,
+        error: "Insufficient credits",
+        remainingCredits: currentCredits,
+      };
+    }
+
+    // Deduct credit and increment totalCreditsUsed
+    await ctx.db.patch(userId, {
+      credits: currentCredits - creditCost,
+      totalCreditsUsed: (user.totalCreditsUsed ?? 0) + creditCost,
+    });
+
+    // Log the action in userActions table
+    await ctx.db.insert("userActions", {
+      userId: userId,
+      imageId: args.imageId,
+      actionType: "copy_prompt",
+    });
+
+
+    return {
+      success: true,
+      remainingCredits: currentCredits - creditCost,
+      prompt: image.prompt,
+    };
   },
 });
 

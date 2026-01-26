@@ -16,6 +16,8 @@ import rag from "@convex-dev/rag/convex.config.js";
  * - polar: Payment processing
  * - agent: AI agents for prompt generation
  * - rag: Retrieval-Augmented Generation for semantic search
+ * 
+ * Note: Convex Auth (@convex-dev/auth) is configured separately in convex/auth.ts
  */
 const app = defineApp();
 

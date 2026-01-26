@@ -43,7 +43,7 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
 
     // Fetch user images with filters
     const result = useQuery(api.images.filter, {
-        userId: user?.id as any,
+        userId: user?._id,
         onlyPublic: false,
         limit: 50,
         mood: filters.moods.length > 0 ? filters.moods : undefined,

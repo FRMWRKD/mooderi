@@ -63,7 +63,7 @@ export function TopBar() {
     const analyzeVideo = useAction(api.videos.analyze);
 
     const [showNotifications, setShowNotifications] = useState(false);
-    const { addJob: addVideoJob, hasActiveJobs, activeCount } = useVideoJobs();
+    const { addJob: addVideoJob, updateJobStatus, hasActiveJobs, activeCount } = useVideoJobs();
     const router = useRouter();
     const pathname = usePathname();
     const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -74,16 +74,55 @@ export function TopBar() {
     const [showFrameSelection, setShowFrameSelection] = useState(false);
     const [pendingFrames, setPendingFrames] = useState<string[]>([]);
     const [pendingVideoUrl, setPendingVideoUrl] = useState("");
+    
+    // Track videos that have already been shown in frame selection modal
+    // Uses sessionStorage to persist across page navigations
+    const getShownVideoIds = useCallback((): Set<string> => {
+        if (typeof window === 'undefined') return new Set();
+        try {
+            const stored = sessionStorage.getItem('shownFrameSelectionVideoIds');
+            return stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch {
+            return new Set();
+        }
+    }, []);
+    
+    const markVideoAsShown = useCallback((videoId: string) => {
+        if (typeof window === 'undefined') return;
+        try {
+            const shown = getShownVideoIds();
+            shown.add(videoId);
+            sessionStorage.setItem('shownFrameSelectionVideoIds', JSON.stringify(Array.from(shown)));
+        } catch {
+            // Ignore storage errors
+        }
+    }, [getShownVideoIds]);
 
-    // Reactive Video Status (replaces legacy polling)
-    const activeVideo = useQuery(api.videos.getById, activeJobId ? { id: activeJobId as any } : "skip");
-    const activeFrames = useQuery(api.videos.getFrames, activeJobId ? { videoId: activeJobId as any } : "skip");
+    // Note: activeVideo/activeFrames queries removed - synchronous path handles everything now
 
-    // Monitor video status changes
+    // Monitor video status changes - DISABLED
+    // The synchronous path in handleStartAnalysis handles everything.
+    // This fallback was causing the modal to reappear on page navigation.
+    // If async processing is needed in the future, this can be re-enabled with better guards.
+    /*
     useEffect(() => {
         if (!activeVideo) return;
+        
+        // Don't process if we already have frames showing (synchronous path handled it)
+        if (showFrameSelection || pendingFrames.length > 0) {
+            return;
+        }
+        
+        // Don't re-show modal for videos we've already handled
+        const shownIds = getShownVideoIds();
+        if (shownIds.has(activeVideo._id)) {
+            return;
+        }
 
         if (activeVideo.status === "pending_approval" && activeFrames && activeFrames.length > 0) {
+            // Mark this video as shown so we don't re-show it
+            markVideoAsShown(activeVideo._id);
+            
             // Ready for frame selection
             const frameUrls = activeFrames.map(f => f.imageUrl);
             setPendingFrames(frameUrls);
@@ -93,16 +132,19 @@ export function TopBar() {
             setActiveJobId(null); // Stop monitoring
             setIsAnalyzing(false);
         } else if (activeVideo.status === "failed") {
+            markVideoAsShown(activeVideo._id);
             setError("Analysis failed: " + ((activeVideo as any).errorMessage || "Unknown error"));
             setActiveJobId(null);
             setIsAnalyzing(false);
             setIsVideoModalOpen(true);
         } else if (activeVideo.status === "completed") {
+            markVideoAsShown(activeVideo._id);
             setActiveJobId(null);
             setIsAnalyzing(false);
             router.push("/videos");
         }
-    }, [activeVideo, activeFrames, router]);
+    }, [activeVideo, activeFrames, router, getShownVideoIds, markVideoAsShown, showFrameSelection, pendingFrames.length]);
+    */
 
     // Refresh credits helper (mostly redundant with reactive Update but kept for manual triggers)
     const refreshCredits = useCallback(async () => {
@@ -123,7 +165,8 @@ export function TopBar() {
             const result = await createVideo({
                 url: videoUrl,
                 qualityMode: quality,
-                title: "New Video"
+                title: "New Video",
+                userId: userData?._id,
             });
 
             if (!result.success || !result.id) {
@@ -135,15 +178,58 @@ export function TopBar() {
             addVideoJob(videoId, videoUrl); // Add to shared context
 
             // 2. Trigger Modal Analysis
-            await analyzeVideo({
-                videoId: videoId,
-                videoUrl,
-                qualityMode: quality
-            });
+            console.log("[TopBar] Calling analyzeVideo with:", { videoId, videoUrl, qualityMode: quality });
+            try {
+                const analyzeResult = await analyzeVideo({
+                    videoId: videoId,
+                    videoUrl,
+                    qualityMode: quality
+                });
+                console.log("[TopBar] analyzeVideo result:", analyzeResult);
+                
+                // Analysis completed - check if we got frames back
+                if (analyzeResult.status === "pending_approval" && analyzeResult.selected_frames?.length > 0) {
+                    // Mark this video as shown to prevent re-showing
+                    markVideoAsShown(videoId);
+                    
+                    // Update job status in context to show completion
+                    updateJobStatus(videoId, "pending_approval", "Ready for review!");
+                    
+                    // Show frame selection modal directly
+                    const frameUrls = analyzeResult.selected_frames.map((f: any) => f.url);
+                    setPendingFrames(frameUrls);
+                    setPendingVideoUrl(videoUrl);
+                    setPendingJobId(videoId);
+                    setShowFrameSelection(true);
+                    setIsVideoModalOpen(false);
+                    setVideoUrl("");
+                    setIsAnalyzing(false);
+                    setActiveJobId(null);
+                    console.log("[TopBar] Opening frame selection with", frameUrls.length, "frames");
+                    return;
+                }
+            } catch (analyzeErr: any) {
+                console.error("[TopBar] analyzeVideo failed:", analyzeErr);
+                const errorMsg = analyzeErr.message || String(analyzeErr);
+                // Show user-friendly error
+                if (errorMsg.includes("No scenes found")) {
+                    setError("No scenes could be extracted from this video. Try a longer video or different quality setting.");
+                } else if (errorMsg.includes("rate limit")) {
+                    setError("Rate limit exceeded. Please wait a few minutes before processing another video.");
+                } else {
+                    setError(`Video analysis failed: ${errorMsg}`);
+                }
+                // Update job status to failed
+                updateJobStatus(videoId, "failed", "Analysis failed");
+                setIsAnalyzing(false);
+                setActiveJobId(null);
+                return; // Don't throw, we've handled the error
+            }
 
             setIsVideoModalOpen(false); // Close input modal
             setVideoUrl("");
-            console.log("Started analysis:", videoId);
+            setIsAnalyzing(false);
+            console.log("[TopBar] Started analysis:", videoId);
 
         } catch (e) {
             console.error("Analysis start error:", e);
@@ -310,7 +396,7 @@ export function TopBar() {
                                         New Board
                                     </DropdownItem>
                                 }
-                                onBoardCreated={() => router.push("/boards")}
+                                onBoardCreated={(board) => router.push(`/folder/${board.id}`)}
                             />
                             <SmartBoardModal
                                 trigger={
@@ -416,18 +502,46 @@ export function TopBar() {
             />
 
             {/* Frame Selection Modal */}
-            <FrameSelectionModal
-                isOpen={showFrameSelection}
-                onClose={() => setShowFrameSelection(false)}
-                jobId={pendingJobId || ""}
-                frames={pendingFrames}
-                videoUrl={pendingVideoUrl}
-                onComplete={() => {
-                    setPendingFrames([]);
-                    refreshCredits(); // Refresh credits after frame approval
-                    router.push("/videos");
-                }}
-            />
+            {/* Frame Selection Modal - only render when we have frames and should show */}
+            {showFrameSelection && pendingFrames.length > 0 && pendingJobId && (
+                <FrameSelectionModal
+                    isOpen={true}
+                    onClose={() => {
+                        console.log("[TopBar] onClose called, pendingJobId:", pendingJobId);
+                        // Mark video as shown so it doesn't reappear
+                        if (pendingJobId) {
+                            markVideoAsShown(pendingJobId);
+                        }
+                        // Clear all frame selection state when modal closes
+                        console.log("[TopBar] Setting showFrameSelection to false");
+                        setShowFrameSelection(false);
+                        setPendingFrames([]);
+                        setPendingJobId(null);
+                        setPendingVideoUrl("");
+                        console.log("[TopBar] onClose finished");
+                    }}
+                    jobId={pendingJobId}
+                    frames={pendingFrames}
+                    videoUrl={pendingVideoUrl}
+                    onComplete={({ count, isPublic }) => {
+                        console.log("[TopBar] onComplete called with count:", count, "isPublic:", isPublic);
+                        // Mark video as shown so it doesn't reappear
+                        if (pendingJobId) {
+                            markVideoAsShown(pendingJobId);
+                            updateJobStatus(pendingJobId, "completed", "Frames saved!");
+                        }
+                        // Clear all frame selection state - this will unmount the modal
+                        console.log("[TopBar] Clearing state to unmount modal");
+                        setShowFrameSelection(false);
+                        setPendingFrames([]);
+                        setPendingJobId(null);
+                        setPendingVideoUrl("");
+                        // Refresh credits after frame approval
+                        refreshCredits();
+                        console.log("[TopBar] onComplete finished");
+                    }}
+                />
+            )}
         </>
     );
 }

@@ -40,16 +40,25 @@ export default function ImageDetailPage({
     const imageId = params.id as Id<"images">;
 
     const image = useQuery(api.images.getById, { id: imageId });
+    const existingVote = useQuery(api.images.getUserVote, { imageId }); // TC-8: Load existing vote
     const { images: vectorImages, isLoading: isVectorLoading } = useSimilarImagesVector(imageId, 12);
     const { similarPrompts, isLoading: isRagLoading } = useFindSimilarPrompts(imageId, 6);
     const similarData = { images: vectorImages }; // Adapting to existing structure
     const voteMutation = useMutation(api.images.vote);
+    const copyPromptMutation = useMutation(api.images.copyPrompt);
 
-    const [activeTab, setActiveTab] = useState<TabType | null>(null);
+    const [activeTab, setActiveTab] = useState<TabType | null>("overview"); // Default to overview so prompts are visible
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
     const [hasVoted, setHasVoted] = useState<"like" | "dislike" | null>(null);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+
+    // TC-8: Sync vote state from server on load
+    useEffect(() => {
+        if (existingVote !== undefined) {
+            setHasVoted(existingVote as "like" | "dislike" | null);
+        }
+    }, [existingVote]);
 
     // Derived state from real-time data
     const likes = image?.likes || 0;
@@ -59,7 +68,16 @@ export default function ImageDetailPage({
     const error = image === null ? "Image not found" : null;
 
     const handleVote = async (type: "like" | "dislike") => {
-        if (hasVoted === type) return;
+        // Toggle off if clicking same vote
+        if (hasVoted === type) {
+            try {
+                await voteMutation({ imageId, voteType: type });
+                setHasVoted(null);
+            } catch (e) {
+                console.error("Failed to remove vote", e);
+            }
+            return;
+        }
         try {
             await voteMutation({ imageId, voteType: type });
             setHasVoted(type);
@@ -68,14 +86,59 @@ export default function ImageDetailPage({
         }
     };
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setSaveMessage("Copied to clipboard!");
-        setTimeout(() => {
-            setCopied(false);
-            setSaveMessage(null);
-        }, 2000);
+    const [isCopyingPrompt, setIsCopyingPrompt] = useState(false);
+    const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+    const [showNoCreditsMessage, setShowNoCreditsMessage] = useState(false);
+
+    const copyToClipboard = async (text: string, isPromptCopy: boolean = false) => {
+        // TC-6: Guest trying to copy prompt - prompt for login
+        if (isPromptCopy && !user) {
+            setShowLoginPrompt(true);
+            setTimeout(() => setShowLoginPrompt(false), 5000);
+            return;
+        }
+
+        // If this is a prompt copy and user is logged in, deduct credits
+        if (isPromptCopy && user) {
+            setIsCopyingPrompt(true);
+            try {
+                const result = await copyPromptMutation({ imageId });
+                if (!result.success) {
+                    // TC-5: No credits remaining
+                    if (result.error === "Insufficient credits") {
+                        setShowNoCreditsMessage(true);
+                        setTimeout(() => setShowNoCreditsMessage(false), 5000);
+                    } else {
+                        setSaveMessage(result.error || "Failed to copy prompt");
+                        setTimeout(() => setSaveMessage(null), 3000);
+                    }
+                    setIsCopyingPrompt(false);
+                    return;
+                }
+                // Success - copy to clipboard
+                navigator.clipboard.writeText(text);
+                setCopied(true);
+                setSaveMessage(`Copied! (${result.remainingCredits} credits remaining)`);
+            } catch (error) {
+                console.error("Failed to copy prompt:", error);
+                setSaveMessage("Failed to copy prompt");
+            } finally {
+                setIsCopyingPrompt(false);
+                setTimeout(() => {
+                    setCopied(false);
+                    setSaveMessage(null);
+                }, 2000);
+            }
+        } else {
+            // Non-prompt copy (like share link)
+            navigator.clipboard.writeText(text);
+            setCopied(true);
+            setSaveMessage("Copied to clipboard!");
+            setTimeout(() => {
+                setCopied(false);
+                setSaveMessage(null);
+            }, 2000);
+        }
     };
 
     const toggleSection = (section: string) => {
@@ -181,9 +244,47 @@ export default function ImageDetailPage({
 
                 {/* Toast Notification */}
                 {saveMessage && (
-                    <div className="fixed top-20 right-6 z-50 bg-white text-black px-4 py-3 shadow-lg flex items-center gap-2">
+                    <div className="fixed top-20 right-6 z-50 bg-white text-black px-4 py-3 shadow-lg flex items-center gap-2 rounded-lg">
                         <Star className="w-4 h-4 fill-current" />
                         {saveMessage}
+                    </div>
+                )}
+
+                {/* TC-6: Login Prompt for Guests */}
+                {showLoginPrompt && (
+                    <div className="fixed top-20 right-6 z-50 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-5 py-4 shadow-lg rounded-lg max-w-sm">
+                        <div className="flex items-start gap-3">
+                            <Lock className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-semibold mb-1">Sign in to copy prompts</p>
+                                <p className="text-sm text-white/80 mb-3">Create a free account to copy prompts and access all features.</p>
+                                <Link
+                                    href="/login"
+                                    className="inline-block bg-white text-purple-600 px-4 py-2 rounded font-medium text-sm hover:bg-white/90 transition-colors"
+                                >
+                                    Sign in / Sign up
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TC-5: No Credits Message */}
+                {showNoCreditsMessage && (
+                    <div className="fixed top-20 right-6 z-50 bg-gradient-to-r from-orange-500 to-red-500 text-white px-5 py-4 shadow-lg rounded-lg max-w-sm">
+                        <div className="flex items-start gap-3">
+                            <Lock className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-semibold mb-1">No credits remaining</p>
+                                <p className="text-sm text-white/80 mb-3">Purchase more credits to continue copying prompts.</p>
+                                <Link
+                                    href="/pricing"
+                                    className="inline-block bg-white text-orange-600 px-4 py-2 rounded font-medium text-sm hover:bg-white/90 transition-colors"
+                                >
+                                    Get more credits
+                                </Link>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -258,6 +359,14 @@ export default function ImageDetailPage({
                             {/* Overview Content */}
                             {activeTab === "overview" && (
                                 <div className="p-4 space-y-5 border-t border-border-subtle bg-white/2">
+                                    {/* Loading State */}
+                                    {image.isAnalyzed === false && (
+                                        <div className="flex items-center gap-3 p-3 bg-accent-blue/10 border border-accent-blue/20 rounded-lg">
+                                            <Loader2 className="w-5 h-5 text-accent-blue animate-spin" />
+                                            <span className="text-sm text-accent-blue">Analyzing image... This may take a moment.</span>
+                                        </div>
+                                    )}
+
                                     {/* Video Source */}
                                     {youtubeId && (
                                         <div className="flex items-center gap-3">
@@ -298,14 +407,15 @@ export default function ImageDetailPage({
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <h3 className="text-xs uppercase tracking-wider text-text-secondary font-bold">
-                                                    Prompt
+                                                    Prompt {user && <span className="text-text-tertiary font-normal">(1 credit)</span>}
                                                 </h3>
                                                 <button
-                                                    onClick={() => copyToClipboard(image.prompt!)}
-                                                    className="p-1.5 rounded hover:bg-white/10 text-text-tertiary hover:text-white transition-colors"
-                                                    title="Copy Prompt"
+                                                    onClick={() => copyToClipboard(image.prompt!, true)}
+                                                    disabled={isCopyingPrompt}
+                                                    className="p-1.5 rounded hover:bg-white/10 text-text-tertiary hover:text-white transition-colors disabled:opacity-50"
+                                                    title="Copy Prompt (1 credit)"
                                                 >
-                                                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                                                    {isCopyingPrompt ? <Loader2 className="w-4 h-4 animate-spin" /> : copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                                                 </button>
                                             </div>
                                             <p className="text-sm leading-relaxed text-text-secondary">
@@ -315,20 +425,25 @@ export default function ImageDetailPage({
                                     )}
 
                                     {/* Properties */}
-                                    {(image.mood || image.lighting) && (
+                                    {(image.mood || image.lighting || image.cameraShot) && (
                                         <div>
                                             <h3 className="text-xs uppercase tracking-wider text-text-secondary font-bold mb-2">
                                                 Properties
                                             </h3>
                                             <div className="flex flex-wrap gap-2">
                                                 {image.mood && (
-                                                    <span className="bg-white/5 px-3 py-1.5 border border-white/10 text-xs text-white/60">
+                                                    <span className="bg-white/5 px-3 py-1.5 border border-white/10 text-xs text-white/60 rounded">
                                                         <strong className="text-white">Mood:</strong> {image.mood}
                                                     </span>
                                                 )}
                                                 {image.lighting && (
-                                                    <span className="bg-white/5 px-3 py-1.5 border border-white/10 text-xs text-white/60">
+                                                    <span className="bg-white/5 px-3 py-1.5 border border-white/10 text-xs text-white/60 rounded">
                                                         <strong className="text-white">Lighting:</strong> {image.lighting}
+                                                    </span>
+                                                )}
+                                                {image.cameraShot && (
+                                                    <span className="bg-white/5 px-3 py-1.5 border border-white/10 text-xs text-white/60 rounded">
+                                                        <strong className="text-white">Camera:</strong> {image.cameraShot}
                                                     </span>
                                                 )}
                                             </div>
@@ -393,7 +508,13 @@ export default function ImageDetailPage({
                             {/* Analysis Content */}
                             {activeTab === "analysis" && (
                                 <div className="p-4 space-y-2 border-t border-border-subtle bg-white/2 overflow-y-auto max-h-[400px]">
-                                    {structured ? (
+                                    {image.isAnalyzed === false ? (
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                            <Loader2 className="w-8 h-8 text-accent-blue animate-spin mb-3" />
+                                            <p className="text-sm text-text-secondary">Generating analysis...</p>
+                                            <p className="text-xs text-text-tertiary mt-1">This may take a moment</p>
+                                        </div>
+                                    ) : structured ? (
                                         <>
                                             {structured.short_description && (
                                                 <div className="p-3 mb-2 bg-accent-purple/10 border border-accent-purple/20 rounded-lg">
@@ -407,9 +528,9 @@ export default function ImageDetailPage({
                                                 {JSON.stringify(structured, null, 2)}
                                             </pre>
                                         </>
-                                    ) : (
+                                    ) : !image.isAnalyzed ? (
                                         <p className="text-sm text-text-secondary text-center py-4">No analysis available.</p>
-                                    )}
+                                    ) : null}
                                 </div>
                             )}
 
@@ -428,21 +549,37 @@ export default function ImageDetailPage({
 
                             {activeTab === "prompts" && (
                                 <div className="p-4 space-y-4 border-t border-border-subtle bg-white/2">
-                                    <PromptBlock
-                                        label="Text-to-Image"
-                                        prompt={generatedPrompts?.text_to_image}
-                                        onCopy={copyToClipboard}
-                                    />
-                                    <PromptBlock
-                                        label="Image-to-Image"
-                                        prompt={generatedPrompts?.image_to_image}
-                                        onCopy={copyToClipboard}
-                                    />
-                                    <PromptBlock
-                                        label="Text-to-Video"
-                                        prompt={generatedPrompts?.text_to_video}
-                                        onCopy={copyToClipboard}
-                                    />
+                                    {image.isAnalyzed === false ? (
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                            <Loader2 className="w-8 h-8 text-accent-blue animate-spin mb-3" />
+                                            <p className="text-sm text-text-secondary">Generating AI prompts...</p>
+                                            <p className="text-xs text-text-tertiary mt-1">This may take a moment</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <PromptBlock
+                                                label="Text-to-Image"
+                                                prompt={generatedPrompts?.text_to_image}
+                                                onCopy={copyToClipboard}
+                                                isLoading={isCopyingPrompt}
+                                                showCreditCost={!!user}
+                                            />
+                                            <PromptBlock
+                                                label="Image-to-Image"
+                                                prompt={generatedPrompts?.image_to_image}
+                                                onCopy={copyToClipboard}
+                                                isLoading={isCopyingPrompt}
+                                                showCreditCost={!!user}
+                                            />
+                                            <PromptBlock
+                                                label="Text-to-Video"
+                                                prompt={generatedPrompts?.text_to_video}
+                                                onCopy={copyToClipboard}
+                                                isLoading={isCopyingPrompt}
+                                                showCreditCost={!!user}
+                                            />
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -518,22 +655,29 @@ function PromptBlock({
     label,
     prompt,
     onCopy,
+    isLoading,
+    showCreditCost,
 }: {
     label: string;
     prompt?: string;
-    onCopy: (text: string) => void;
+    onCopy: (text: string, isPromptCopy: boolean) => void;
+    isLoading?: boolean;
+    showCreditCost?: boolean;
 }) {
     return (
         <div className="p-3 bg-white/3 border border-border-subtle rounded-lg">
             <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-accent-purple">{label}</span>
+                <span className="text-xs font-semibold text-accent-purple">
+                    {label} {showCreditCost && <span className="text-text-tertiary font-normal">(1 credit)</span>}
+                </span>
                 {prompt && (
                     <button
-                        className="p-1 hover:bg-white/10 rounded text-text-tertiary hover:text-white transition-colors"
-                        onClick={() => onCopy(prompt)}
-                        title="Copy"
+                        className="p-1 hover:bg-white/10 rounded text-text-tertiary hover:text-white transition-colors disabled:opacity-50"
+                        onClick={() => onCopy(prompt, true)}
+                        disabled={isLoading}
+                        title="Copy (1 credit)"
                     >
-                        <Copy className="w-3 h-3" />
+                        {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
                     </button>
                 )}
             </div>

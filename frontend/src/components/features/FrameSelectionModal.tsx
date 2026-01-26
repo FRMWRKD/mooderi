@@ -6,14 +6,13 @@ import {
     ModalHeader,
     ModalTitle,
     ModalBody,
-    ModalFooter,
-    ModalCloseButton
+    ModalFooter
 } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useState, useEffect } from "react";
-import { Check, CheckCircle2, Loader2, Images, Globe, Lock, FolderOpen, ChevronDown, Gift } from "lucide-react";
+import { Check, Loader2, Globe, Lock, FolderOpen, ChevronDown, Gift } from "lucide-react";
 import { api } from "@convex/_generated/api";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 
 interface FrameSelectionModalProps {
@@ -22,7 +21,7 @@ interface FrameSelectionModalProps {
     jobId: string;
     frames: string[];
     videoUrl: string;
-    onComplete: () => void;
+    onComplete: (info: { count: number; isPublic: boolean }) => void;
 }
 
 export function FrameSelectionModal({
@@ -36,8 +35,6 @@ export function FrameSelectionModal({
     const router = useRouter();
     const [selectedFrames, setSelectedFrames] = useState<string[]>(frames);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [savedCount, setSavedCount] = useState<number | null>(null);
-    const [showSuccess, setShowSuccess] = useState(false);
 
     // New states for public/folder options
     const [isPublic, setIsPublic] = useState(true);
@@ -47,12 +44,11 @@ export function FrameSelectionModal({
     // Convex hooks
     const boards = useQuery(api.boards.list, {});
     const approveFrames = useMutation(api.videos.approveFrames);
+    const analyzeApprovedFrames = useAction(api.videos.analyzeApprovedFrames);
 
     // Reset selected frames when frames prop changes
     useEffect(() => {
         setSelectedFrames(frames);
-        setSavedCount(null);
-        setShowSuccess(false);
     }, [frames]);
 
     // Close folder menu when clicking outside
@@ -73,7 +69,14 @@ export function FrameSelectionModal({
     };
 
     const handleConfirm = async () => {
+        if (isSubmitting) {
+            console.log("[FrameSelection] Already submitting, ignoring click");
+            return;
+        }
+        
+        console.log("[FrameSelection] Starting save...");
         setIsSubmitting(true);
+        
         try {
             const result = await approveFrames({
                 videoId: jobId as any,
@@ -81,19 +84,28 @@ export function FrameSelectionModal({
                 isPublic,
                 folderId: selectedFolderId as any || undefined,
             });
+            console.log("[FrameSelection] Save successful:", result);
 
             const count = result.approved_count;
-            setSavedCount(count);
-            setShowSuccess(true);
-            onComplete();
+            
+            // Trigger analysis for approved frames in the background (only for new images)
+            if (result.imageIds && result.imageIds.length > 0 && !result.alreadyProcessed) {
+                console.log("[FrameSelection] Triggering analysis for", result.imageIds.length, "frames");
+                analyzeApprovedFrames({ imageIds: result.imageIds }).catch((err) => {
+                    console.error("Background analysis failed:", err);
+                });
+            }
 
-            setTimeout(() => {
-                router.push("/my-images");
-            }, 1500);
+            // Reset submitting state
+            setIsSubmitting(false);
+            
+            // Call onComplete which will unmount the modal via conditional rendering
+            console.log("[FrameSelection] Calling onComplete to close modal");
+            onComplete({ count, isPublic });
+            
         } catch (e) {
-            console.error("Failed to approve frames", e);
+            console.error("[FrameSelection] Save failed:", e);
             alert("Failed to save selection: " + (e instanceof Error ? e.message : "Unknown error"));
-        } finally {
             setIsSubmitting(false);
         }
     };
@@ -104,13 +116,10 @@ export function FrameSelectionModal({
     };
 
     const handleClose = () => {
-        setShowSuccess(false);
-        setSavedCount(null);
         onClose();
     };
 
     const creditsNeeded = isPublic ? 0 : selectedFrames.length;
-    const freeCreditsEarned = isPublic ? Math.floor(selectedFrames.length / 10) : 0;
 
     const boardsList = boards || [];
     const selectedFolder = Array.isArray(boardsList) ? boardsList.find(f => f._id === selectedFolderId) : undefined;
@@ -122,53 +131,15 @@ export function FrameSelectionModal({
                 <ModalContent className="max-w-4xl max-h-[90vh] flex flex-col">
                     <ModalHeader>
                         <ModalTitle>
-                            {showSuccess ? "Images Saved!" : "Select Best Frames"}
+                            Select Best Frames
                         </ModalTitle>
-                        {!showSuccess && (
-                            <div className="text-sm text-text-secondary">
-                                {selectedFrames.length} selected / {frames.length} extracted
-                            </div>
-                        )}
+                        <div className="text-sm text-text-secondary">
+                            {selectedFrames.length} selected / {frames.length} extracted
+                        </div>
                     </ModalHeader>
 
                     <ModalBody className="flex-1 overflow-y-auto p-6">
-                        {showSuccess ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
-                                    <CheckCircle2 className="w-10 h-10 text-green-500" />
-                                </div>
-                                <h3 className="text-xl font-semibold mb-2">
-                                    {savedCount} {savedCount === 1 ? "Image" : "Images"} Saved Successfully!
-                                </h3>
-                                <p className="text-text-secondary mb-2">
-                                    Your frames have been added to your image library.
-                                </p>
-                                {isPublic && savedCount && (
-                                    <p className="text-sm text-green-400 mb-4 flex items-center gap-1">
-                                        <Gift className="w-4 h-4" />
-                                        Thanks for contributing to the community!
-                                        {freeCreditsEarned > 0 && (
-                                            <span className="font-medium ml-1">+{freeCreditsEarned} free credits earned</span>
-                                        )}
-                                    </p>
-                                )}
-                                {selectedFolder && (
-                                    <p className="text-sm text-accent-blue mb-4">
-                                        Saved to folder: {selectedFolder.name}
-                                    </p>
-                                )}
-                                <div className="flex gap-3">
-                                    <Button variant="secondary" onClick={handleClose}>
-                                        Close
-                                    </Button>
-                                    <Button variant="default" onClick={handleGoToMyImages}>
-                                        <Images className="w-4 h-4 mr-2" />
-                                        View My Images
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
+                        <>
                                 <div className="flex flex-wrap gap-4 mb-6 p-4 bg-white/5 rounded-xl">
                                     <div className="flex-1 min-w-[200px]">
                                         <div className="text-xs text-text-tertiary uppercase tracking-wider mb-2">Visibility</div>
@@ -287,38 +258,35 @@ export function FrameSelectionModal({
                                         );
                                     })}
                                 </div>
-                            </>
-                        )}
+                        </>
                     </ModalBody>
 
-                    {!showSuccess && (
-                        <ModalFooter className="flex-col gap-3 sm:flex-row">
-                            <div className="flex-1 text-sm text-text-secondary">
-                                {isPublic ? (
-                                    <span className="text-green-400">✨ Free – Contributing to community</span>
+                    <ModalFooter className="flex-col gap-3 sm:flex-row">
+                        <div className="flex-1 text-sm text-text-secondary">
+                            {isPublic ? (
+                                <span className="text-green-400">✨ Free – Contributing to community</span>
+                            ) : (
+                                <span>Cost: <span className="font-medium text-text-primary">{creditsNeeded} credits</span></span>
+                            )}
+                        </div>
+                        <div className="flex gap-3">
+                            <Button variant="secondary" onClick={handleClose}>Discard</Button>
+                            <Button
+                                variant="default"
+                                onClick={handleConfirm}
+                                disabled={isSubmitting || selectedFrames.length === 0}
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Saving...
+                                    </>
                                 ) : (
-                                    <span>Cost: <span className="font-medium text-text-primary">{creditsNeeded} credits</span></span>
+                                    `Save ${selectedFrames.length} Images`
                                 )}
-                            </div>
-                            <div className="flex gap-3">
-                                <Button variant="secondary" onClick={handleClose}>Discard</Button>
-                                <Button
-                                    variant="default"
-                                    onClick={handleConfirm}
-                                    disabled={isSubmitting || selectedFrames.length === 0}
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        `Save ${selectedFrames.length} Images`
-                                    )}
-                                </Button>
-                            </div>
-                        </ModalFooter>
-                    )}
+                            </Button>
+                        </div>
+                    </ModalFooter>
                 </ModalContent>
             </Modal>
         </div>

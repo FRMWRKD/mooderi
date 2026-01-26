@@ -3,7 +3,7 @@
 import { AppShell } from "@/components/layout";
 import { ImageCard, FilterBar, type FilterState, NewBoardModal, LandingPage, SortDropdown } from "@/components/features";
 import { Button } from "@/components/ui/Button";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 // import { api, type Image, type Board, type Video } from "@/lib/api"; // Legacy
 import { api } from "@convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
@@ -11,6 +11,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { X, FolderPlus, Trash2, Check, Loader2, Play, Grid, LayoutList } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
     Dropdown,
     DropdownTrigger,
@@ -20,14 +21,39 @@ import {
     DropdownSeparator,
 } from "@/components/ui/Dropdown";
 
+// Wrapper component for Suspense boundary
 export default function HomePage() {
-    const { user, isLoading: isAuthLoading } = useAuth();
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+            </div>
+        }>
+            <HomePageContent />
+        </Suspense>
+    );
+}
+
+function HomePageContent() {
+    const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
+    // Read initial values from URL
+    const urlQuery = searchParams.get("q") || "";
+    const urlType = (searchParams.get("type") as "text" | "semantic") || "text";
 
     // UI State
     const [viewMode, setViewMode] = useState<"grid" | "list" | "videos">("grid");
     const [limit, setLimit] = useState(50);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [searchType, setSearchType] = useState<"text" | "semantic">("text"); // Semantic not fully impl yet
+    const [searchQuery, setSearchQuery] = useState(urlQuery);
+    const [searchType, setSearchType] = useState<"text" | "semantic">(urlType);
+
+    // Sync state with URL when URL changes (e.g., from TopBar navigation)
+    useEffect(() => {
+        setSearchQuery(urlQuery);
+        setSearchType(urlType);
+    }, [urlQuery, urlType]);
 
     const [activeFilters, setActiveFilters] = useState<FilterState>({
         moods: [],
@@ -116,6 +142,13 @@ export default function HomePage() {
         setLimit(50);
         setSearchQuery(query);
         setSearchType(type);
+
+        // Update URL to reflect search state (for bookmarking/sharing)
+        if (query.trim()) {
+            router.push(`/?q=${encodeURIComponent(query)}&type=${type}`, { scroll: false });
+        } else {
+            router.push("/", { scroll: false });
+        }
     };
 
     const loadMore = () => {
@@ -169,7 +202,7 @@ export default function HomePage() {
         clearSelection();
     };
 
-    // Loading check
+    // Loading check - show loading spinner while auth state is being determined
     if (isAuthLoading) {
         return (
             <div className="min-h-screen bg-[#050505] flex items-center justify-center">
@@ -178,12 +211,22 @@ export default function HomePage() {
         );
     }
 
-    // Show Landing Page if not authenticated
-    // Assume user object from AuthContext is null if not logged in
-    // Note: useAuth comes from Clerk usually, if we use Clerk. 
-    // The previous code checked `if (!user) return <LandingPage />`.
-    // I will keep that.
-    if (!user) {
+    // If user is authenticated but user data hasn't loaded yet, show loading
+    // This happens during OAuth flow when isAuthenticated=true but currentUser query is still loading
+    // Note: user === null means query returned null (user being created), user === undefined would mean still loading
+    if (isAuthenticated && !user) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                    <p className="text-white/60 text-sm">Setting up your account...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show Landing Page only if user is NOT authenticated
+    if (!isAuthenticated && !user) {
         return <LandingPage />;
     }
 
@@ -252,7 +295,7 @@ export default function HomePage() {
                                             Create new board
                                         </DropdownItem>
                                     }
-                                    onBoardCreated={() => {
+                                    onBoardCreated={(_board) => {
                                         // Convex auto updates
                                     }}
                                 />
@@ -272,6 +315,8 @@ export default function HomePage() {
                 <div className="flex items-center justify-between gap-4 mb-4">
                     <div className="flex-1">
                         <FilterBar
+                            initialQuery={urlQuery}
+                            initialType={urlType}
                             onSearch={handleSearch}
                             onFilterChange={handleFilterChange}
                             dynamicMoods={dynamicMoods}

@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Users Module
@@ -18,19 +19,18 @@ import { v } from "convex/values";
 
 /**
  * Get current authenticated user
+ * Uses @convex-dev/auth's getAuthUserId helper for reliable user lookup
  */
 export const getCurrent = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    // Use the official helper from @convex-dev/auth
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
     
-    return await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => 
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .first();
+    // Get the user document
+    const user = await ctx.db.get(userId);
+    return user;
   },
 });
 
@@ -52,7 +52,7 @@ export const getByEmail = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("email", (q) => q.eq("email", args.email))
       .first();
   },
 });
@@ -128,52 +128,60 @@ export const storeFromSupabase = mutation({
 });
 
 /**
- * Store/update user from Convex auth provider (legacy)
- * Call this after authentication to sync user data
+ * Store/update user from Convex auth provider
+ * This syncs additional data to the user created by @convex-dev/auth
+ * Should NOT create new users - auth library handles that
  */
 export const store = mutation({
   args: {},
   handler: async (ctx) => {
+    // Use the official helper from @convex-dev/auth
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    // Get the user document
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    
+    // Get identity for profile info
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new Error("No identity found");
     
-    // Check if user already exists
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => 
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .first();
-    
-    if (existingUser) {
-      // Update existing user with latest info
-      await ctx.db.patch(existingUser._id, {
-        name: identity.name ?? existingUser.name,
-        email: identity.email ?? existingUser.email,
-        avatarUrl: identity.pictureUrl ?? existingUser.avatarUrl,
-      });
-      return existingUser._id;
-    }
-    
-    // Create new user with initial credits
-    const userId = await ctx.db.insert("users", {
-      name: identity.name ?? "Anonymous",
-      email: identity.email,
-      avatarUrl: identity.pictureUrl,
+    // Update user with latest info from identity
+    await ctx.db.patch(userId, {
+      name: identity.name ?? user.name,
+      email: identity.email ?? user.email,
+      avatarUrl: identity.pictureUrl ?? user.avatarUrl,
       tokenIdentifier: identity.tokenIdentifier,
-      credits: 100, // Free initial credits
-      totalCreditsUsed: 0,
+      // Initialize credits if not set
+      ...(user.credits === undefined ? { credits: 100, totalCreditsUsed: 0 } : {}),
     });
     
-    // Schedule welcome email
-    if (identity.email) {
-      await ctx.scheduler.runAfter(0, internal.email.sendWelcomeEmail, {
-        email: identity.email,
-        name: identity.name ?? "Friend",
-      });
+    return userId;
+  },
+});
+
+/**
+ * Initialize new user with default credits
+ * Called once after user is created through OAuth
+ */
+export const initializeNewUser = mutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new Error("User not found");
     }
     
-    return userId;
+    // Only set credits if they haven't been set yet
+    if (user.credits === undefined) {
+      await ctx.db.patch(args.userId, {
+        credits: 100, // Free initial credits
+        totalCreditsUsed: 0,
+      });
+    }
   },
 });
 

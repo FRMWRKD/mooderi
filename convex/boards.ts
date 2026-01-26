@@ -1,6 +1,7 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Boards Module
@@ -11,6 +12,12 @@ import { Doc } from "./_generated/dataModel";
  * - Adding/removing images from boards
  * - Board visibility
  */
+
+// Helper function to get current user ID from auth context
+async function getCurrentUserId(ctx: QueryCtx | MutationCtx): Promise<Id<"users"> | null> {
+  // Use the official helper from @convex-dev/auth
+  return await getAuthUserId(ctx);
+}
 
 // ============================================
 // QUERIES
@@ -29,10 +36,16 @@ export const list = query({
   handler: async (ctx, args) => {
     let boards: Doc<"boards">[] = [];
     
-    if (args.userId) {
+    // Get userId from args or from authenticated user
+    let userId = args.userId;
+    if (!userId && !args.includePublic) {
+      userId = (await getCurrentUserId(ctx)) ?? undefined;
+    }
+    
+    if (userId) {
       boards = await ctx.db
         .query("boards")
-        .withIndex("by_user", (q) => q.eq("userId", args.userId!))
+        .withIndex("by_user", (q) => q.eq("userId", userId!))
         .order("desc")
         .collect();
     } else if (args.includePublic) {
@@ -75,13 +88,23 @@ export const list = query({
 /**
  * Get a single board with its images
  * Migrated from: get_board_with_images RPC
+ * TC-9: Private boards require authentication and ownership
  */
 export const getWithImages = query({
   args: { boardId: v.id("boards") },
   handler: async (ctx, args) => {
     const board = await ctx.db.get(args.boardId);
     if (!board) return null;
-    
+
+    // TC-9: Check access for private boards
+    if (!board.isPublic) {
+      const currentUserId = await getCurrentUserId(ctx);
+      // Private boards require authentication and ownership
+      if (!currentUserId || currentUserId !== board.userId) {
+        return null; // Unauthorized - treat as not found
+      }
+    }
+
     // Get all images in this board
     const boardImages = await ctx.db
       .query("boardImages")
@@ -108,11 +131,23 @@ export const getWithImages = query({
 
 /**
  * Get board by ID (without images)
+ * TC-9: Private boards require authentication and ownership
  */
 export const getById = query({
   args: { id: v.id("boards") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    const board = await ctx.db.get(args.id);
+    if (!board) return null;
+
+    // TC-9: Check access for private boards
+    if (!board.isPublic) {
+      const currentUserId = await getCurrentUserId(ctx);
+      if (!currentUserId || currentUserId !== board.userId) {
+        return null; // Unauthorized - treat as not found
+      }
+    }
+
+    return board;
   },
 });
 
@@ -147,10 +182,20 @@ export const create = mutation({
     colorTheme: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Get userId from args or from authenticated user
+    let userId = args.userId;
+    if (!userId) {
+      userId = (await getCurrentUserId(ctx)) ?? undefined;
+    }
+
+    if (!userId) {
+      throw new Error("User must be authenticated to create a board");
+    }
+
     const boardId = await ctx.db.insert("boards", {
       name: args.name,
       description: args.description,
-      userId: args.userId,
+      userId: userId,
       parentId: args.parentId,
       isPublic: args.isPublic ?? false,
       colorTheme: args.colorTheme ?? "#6366f1",

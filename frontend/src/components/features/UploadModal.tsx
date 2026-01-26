@@ -13,10 +13,11 @@ import {
 } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Upload, Globe, Lock, Image as ImageIcon, X, Loader2, CheckCircle2 } from "lucide-react";
-import { useMutation, useAction, useConvex } from "convex/react";
+import { useMutation, useAction, useConvex, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Id } from "@convex/_generated/dataModel";
+import { useConvexAuth } from "convex/react";
 
 interface UploadModalProps {
     trigger?: React.ReactNode;
@@ -24,6 +25,9 @@ interface UploadModalProps {
 }
 
 type UploadStatus = "idle" | "uploading" | "analyzing" | "complete" | "error";
+
+// Get the Convex HTTP endpoint URL from environment
+const CONVEX_SITE_URL = process.env.NEXT_PUBLIC_CONVEX_URL?.replace('.cloud', '.site') || '';
 
 export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -38,9 +42,15 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
 
     const { user } = useAuth();
 
-    // Convex hooks
-    // const convexUser = useQuery(api.users.getBySupabaseId, user?.id ? { supabaseId: user.id } : "skip");
+    // Check if R2 is configured
+    const isR2Configured = useQuery(api.r2Storage.isConfigured);
+    
+    // Convex hooks - legacy Convex Storage
     const generateUploadUrl = useMutation(api.images.generateUploadUrl);
+    
+    // R2 upload action
+    const generateR2UploadUrl = useAction(api.r2Storage.generatePresignedUploadUrl);
+    
     const createImage = useMutation(api.images.create);
     const analyzeImage = useAction(api.ai.analyzeImage);
 
@@ -96,45 +106,88 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
 
             setProgress(10);
 
-            // 1. Get short-lived upload URL
-            const postUrl = await generateUploadUrl();
+            let imageId: Id<"images">;
+            let finalImageUrl: string;
 
-            setProgress(30);
+            // Use R2 if configured, otherwise fall back to Convex Storage
+            if (isR2Configured) {
+                // ========== R2 UPLOAD FLOW ==========
+                console.log("[UploadModal] Using Cloudflare R2 storage");
+                
+                // 1. Get presigned upload URL from R2
+                const { uploadUrl, fileKey, publicUrl } = await generateR2UploadUrl({
+                    contentType: file.type,
+                    prefix: "uploads",
+                });
 
-            // 2. Upload file to Convex Storage
-            const result = await fetch(postUrl, {
-                method: "POST",
-                headers: { "Content-Type": file.type },
-                body: file,
-            });
+                setProgress(30);
 
-            if (!result.ok) {
-                throw new Error(`Upload failed: ${result.statusText}`);
+                // 2. Upload file directly to R2
+                const uploadResult = await fetch(uploadUrl, {
+                    method: "PUT",
+                    headers: { "Content-Type": file.type },
+                    body: file,
+                });
+
+                if (!uploadResult.ok) {
+                    throw new Error(`R2 upload failed: ${uploadResult.statusText}`);
+                }
+
+                setProgress(60);
+                finalImageUrl = publicUrl;
+
+                // 3. Create image record with R2 key and public URL
+                imageId = await createImage({
+                    imageUrl: publicUrl,
+                    r2Key: fileKey,
+                    isPublic: isPublic,
+                    sourceType: "upload",
+                });
+            } else {
+                // ========== LEGACY CONVEX STORAGE FLOW ==========
+                console.log("[UploadModal] Using Convex Storage (R2 not configured)");
+                
+                // 1. Get short-lived upload URL
+                const postUrl = await generateUploadUrl();
+
+                setProgress(30);
+
+                // 2. Upload file to Convex Storage
+                const result = await fetch(postUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": file.type },
+                    body: file,
+                });
+
+                if (!result.ok) {
+                    throw new Error(`Upload failed: ${result.statusText}`);
+                }
+
+                const { storageId } = await result.json();
+
+                setProgress(60);
+
+                // 3. Create image record with storage ID
+                imageId = await createImage({
+                    storageId: storageId as Id<"_storage">,
+                    isPublic: isPublic,
+                    sourceType: "upload",
+                });
+
+                // Get the image URL for analysis
+                const createdImage = await convexClient.query(api.images.getById, { id: imageId });
+                finalImageUrl = createdImage?.imageUrl || "";
             }
-
-            const { storageId } = await result.json();
-
-            setProgress(60);
-
-            // 3. Create image record with storage ID
-            const imageId = await createImage({
-                storageId: storageId as Id<"_storage">,
-                isPublic: isPublic,
-                sourceType: "upload",
-                // userId is handled by mutation using ctx.auth
-            });
 
             setProgress(80);
             setStatus("analyzing");
 
             // 4. Trigger AI analysis
-            // Fetch the created image to get its URL
             try {
-                const createdImage = await convexClient.query(api.images.getById, { id: imageId });
-                if (createdImage?.imageUrl) {
+                if (finalImageUrl) {
                     await analyzeImage({
                         imageId: imageId,
-                        imageUrl: createdImage.imageUrl,
+                        imageUrl: finalImageUrl,
                     });
                     console.log("[UploadModal] AI analysis triggered");
                 } else {

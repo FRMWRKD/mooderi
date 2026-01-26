@@ -68,10 +68,24 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
   },
   
-  // Landing Page Prompt Generator - 5 per hour per IP
+  // Landing Page Prompt Generator - 3 per hour per IP (guests)
   landingPromptGenHour: {
     kind: "fixed window",
+    rate: 3,
+    period: HOUR,
+  },
+
+  // Authenticated User Prompt Generator - 5 per minute
+  userPromptGenMinute: {
+    kind: "fixed window",
     rate: 5,
+    period: MINUTE,
+  },
+
+  // Authenticated User Prompt Generator - 20 per hour
+  userPromptGenHour: {
+    kind: "fixed window",
+    rate: 20,
     period: HOUR,
   },
 

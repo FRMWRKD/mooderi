@@ -21,13 +21,45 @@ export default defineSchema({
   // Auth tables from @convex-dev/auth
   ...authTables,
   
+  // Override users table to extend with custom fields
+  users: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    image: v.optional(v.string()),
+    isAnonymous: v.optional(v.boolean()),
+    
+    // Custom fields
+    avatarUrl: v.optional(v.string()),
+    tokenIdentifier: v.optional(v.string()), // From auth provider
+    
+    // Credits system
+    credits: v.optional(v.number()),
+    totalCreditsUsed: v.optional(v.number()),
+    
+    // Subscription status (from Polar)
+    isUnlimitedSubscriber: v.optional(v.boolean()),
+    subscriptionExpiresAt: v.optional(v.number()),
+    
+    // Preferences
+    preferences: v.optional(v.object({
+      theme: v.optional(v.union(v.literal("light"), v.literal("dark"))),
+      defaultBoardId: v.optional(v.id("boards")),
+    })),
+  })
+    .index("email", ["email"])
+    .index("by_token", ["tokenIdentifier"]),
+  
   // ============================================
   // IMAGES TABLE - Main content table
   // ============================================
   images: defineTable({
     // Core fields
     imageUrl: v.string(),
-    storageId: v.optional(v.id("_storage")),
+    storageId: v.optional(v.id("_storage")), // Legacy: Convex Storage
+    r2Key: v.optional(v.string()), // New: Cloudflare R2 file key
     thumbnailUrl: v.optional(v.string()),
     
     // AI-generated content
@@ -182,32 +214,6 @@ export default defineSchema({
     .index("by_modal_job", ["modalJobId"]),
 
   // ============================================
-  // USERS TABLE - User profiles
-  // ============================================
-  users: defineTable({
-    name: v.string(),
-    email: v.optional(v.string()),
-    avatarUrl: v.optional(v.string()),
-    tokenIdentifier: v.string(), // From auth provider
-    
-    // Credits system
-    credits: v.optional(v.number()),
-    totalCreditsUsed: v.optional(v.number()),
-    
-    // Subscription status (from Polar)
-    isUnlimitedSubscriber: v.optional(v.boolean()),
-    subscriptionExpiresAt: v.optional(v.number()),
-    
-    // Preferences
-    preferences: v.optional(v.object({
-      theme: v.optional(v.union(v.literal("light"), v.literal("dark"))),
-      defaultBoardId: v.optional(v.id("boards")),
-    })),
-  })
-    .index("by_token", ["tokenIdentifier"])
-    .index("by_email", ["email"]),
-
-  // ============================================
   // NOTIFICATIONS TABLE
   // ============================================
   notifications: defineTable({
@@ -251,12 +257,13 @@ export default defineSchema({
   // ============================================
   userActions: defineTable({
     userId: v.id("users"),
-    imageId: v.id("images"),
+    imageId: v.optional(v.id("images")),
     actionType: v.union(
       v.literal("like"),
       v.literal("dislike"),
       v.literal("favorite"),
-      v.literal("copy_prompt")
+      v.literal("copy_prompt"),
+      v.literal("generate_prompt")
     ),
   })
     .index("by_user", ["userId"])
@@ -478,5 +485,17 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_public", ["isPublic"])
     .index("by_user_saved", ["userId", "isSaved"]),
+
+  // ============================================
+  // PROCESSED_PAYMENTS TABLE - Idempotency for webhooks
+  // ============================================
+  processedPayments: defineTable({
+    orderId: v.string(), // Polar checkout/order ID
+    userId: v.id("users"),
+    productId: v.string(),
+    credits: v.number(),
+    processedAt: v.number(),
+  })
+    .index("by_order", ["orderId"]),
 });
 

@@ -1,7 +1,9 @@
 import { Polar } from "@convex-dev/polar";
+import { Polar as PolarSDK } from "@polar-sh/sdk";
 import { api, components } from "./_generated/api";
 import { query, action, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * Polar Payments Configuration
@@ -21,23 +23,25 @@ import { v } from "convex/values";
 export const polar: any = new Polar(components.polar, {
   // Get current user info for checkout
   getUserInfo: async (ctx: any) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    // Use getAuthUserId to get the user ID from @convex-dev/auth
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       throw new Error("User must be authenticated");
     }
     
-    // Find user by email
-    const user = await ctx.runQuery(api.users.getByEmail, { 
-      email: identity.email! 
-    });
-    
+    // Get the user from database using runQuery (actions don't have direct db access)
+    const user = await ctx.runQuery(api.users.getById, { id: userId });
     if (!user) {
       throw new Error("User not found");
     }
     
+    if (!user.email) {
+      throw new Error("User email is required for checkout. Please update your profile.");
+    }
+    
     return {
       userId: user._id,
-      email: identity.email!,
+      email: user.email,
     };
   },
   // Map product keys to Polar product IDs (update these after creating products in Polar)
@@ -47,7 +51,7 @@ export const polar: any = new Polar(components.polar, {
     unlimitedMonthly: process.env.POLAR_UNLIMITED_MONTHLY_ID ?? "placeholder_unlimited",
   },
   // Server mode: sandbox for testing, production for live
-  server: "sandbox" as const,
+  server: "production" as const,
 });
 
 // Export API functions for frontend
@@ -75,7 +79,7 @@ export const getCurrentSubscription = query({
     
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("email", (q) => q.eq("email", identity.email!))
       .first();
     
     if (!user) return null;
@@ -86,18 +90,16 @@ export const getCurrentSubscription = query({
 
 /**
  * Get user's credit balance
+ * Uses getAuthUserId for consistency with users.getCurrent
  */
 export const getCreditBalance = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-    
+    // Use getAuthUserId for consistency with users.getCurrent
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const user = await ctx.db.get(userId);
     return user?.credits ?? 0;
   },
 });
@@ -109,6 +111,7 @@ export const getCreditBalance = query({
 /**
  * Add credits to user after successful payment
  * Called by Polar webhook on order.paid event
+ * Includes idempotency check to prevent duplicate credit additions
  */
 export const addCredits = internalMutation({
   args: {
@@ -118,17 +121,39 @@ export const addCredits = internalMutation({
     orderId: v.optional(v.string()),
   },
   handler: async (ctx, { userId, credits, productId, orderId }) => {
+    // Idempotency check - prevent duplicate credit additions
+    if (orderId) {
+      const existingPayment = await ctx.db
+        .query("processedPayments")
+        .withIndex("by_order", (q) => q.eq("orderId", orderId))
+        .first();
+
+      if (existingPayment) {
+        return { success: false, duplicate: true, message: "Order already processed" };
+      }
+    }
+
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("User not found");
-    
+
     const currentCredits = user.credits ?? 0;
-    
+
+    // Add credits
     await ctx.db.patch(userId, {
       credits: currentCredits + credits,
     });
-    
-    console.log(`[addCredits] Added ${credits} credits to user ${userId}. New balance: ${currentCredits + credits}`);
-    
+
+    // Record the processed payment for idempotency
+    if (orderId) {
+      await ctx.db.insert("processedPayments", {
+        orderId,
+        userId,
+        productId,
+        credits,
+        processedAt: Date.now(),
+      });
+    }
+
     return { success: true, newBalance: currentCredits + credits };
   },
 });
@@ -164,6 +189,66 @@ export const syncProducts = action({
   handler: async (ctx) => {
     await polar.syncProducts(ctx);
     return { success: true };
+  },
+});
+
+/**
+ * Create a checkout URL using Polar SDK directly
+ * This works with both one-time payments and subscriptions
+ *
+ * For embedded checkout, pass embedOrigin (e.g., "http://localhost:3005")
+ * to enable the checkout to communicate with the parent page.
+ */
+export const createCheckoutUrl = action({
+  args: {
+    productId: v.string(),
+    successUrl: v.string(),
+    embedOrigin: v.optional(v.string()),
+  },
+  handler: async (ctx, { productId, successUrl, embedOrigin }) => {
+    // Get authenticated user
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    // Get user email
+    const user = await ctx.runQuery(api.users.getById, { id: userId });
+    if (!user) {
+      throw new Error("User not found");
+    }
+    if (!user.email) {
+      throw new Error("User email is required for checkout");
+    }
+
+    // Initialize Polar SDK with organization token
+    const polarSdk = new PolarSDK({
+      accessToken: process.env.POLAR_ORGANIZATION_TOKEN,
+      server: "production",
+    });
+
+    try {
+      // Create checkout session with embedOrigin for embedded checkout support
+      const checkout = await polarSdk.checkouts.create({
+        products: [productId],
+        customerEmail: user.email,
+        successUrl,
+        embedOrigin: embedOrigin || undefined,
+        metadata: {
+          userId: String(userId),
+          source: "mooderi",
+        },
+      });
+
+      return {
+        success: true,
+        checkoutUrl: checkout.url,
+        checkoutId: checkout.id,
+      };
+    } catch (error: any) {
+      console.error("[createCheckoutUrl] Error:", error);
+      throw new Error(`Failed to create checkout: ${error.message}`);
+    }
   },
 });
 

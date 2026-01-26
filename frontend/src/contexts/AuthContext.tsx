@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, ReactNode } from "react";
+import { createContext, useContext, useEffect, ReactNode, useRef } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@convex/_generated/api";
@@ -33,21 +33,46 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
     // Get current user from Convex
     const currentUser = useQuery(api.users.getCurrent);
-
-    // Store user mutation (called after OAuth)
+    
+    // Store/sync user profile info
     const storeUser = useMutation(api.users.store);
+    // Initialize user credits if needed (only once per session)
+    const initializeUser = useMutation(api.users.initializeNewUser);
+    const initializationAttempted = useRef(false);
+    const storeAttempted = useRef(false);
+    const previousAuthState = useRef(isAuthenticated);
 
-    // Sync user to database after authentication
+    // Reset refs when auth state changes (logout -> login)
     useEffect(() => {
-        if (isAuthenticated && currentUser === null) {
-            // User is authenticated but not in database yet, store them
-            storeUser({}).catch(console.error);
+        if (previousAuthState.current !== isAuthenticated) {
+            previousAuthState.current = isAuthenticated;
+            if (isAuthenticated) {
+                // User just logged in - reset the refs
+                initializationAttempted.current = false;
+                storeAttempted.current = false;
+            }
+        }
+    }, [isAuthenticated]);
+
+    // Sync user profile info after login
+    useEffect(() => {
+        if (isAuthenticated && currentUser && !storeAttempted.current) {
+            storeAttempted.current = true;
+            storeUser().catch(console.error);
         }
     }, [isAuthenticated, currentUser, storeUser]);
 
+    useEffect(() => {
+        // Only attempt initialization once when user is authenticated but has no credits set
+        if (isAuthenticated && currentUser && currentUser.credits === undefined && !initializationAttempted.current) {
+            initializationAttempted.current = true;
+            initializeUser({ userId: currentUser._id }).catch(console.error);
+        }
+    }, [isAuthenticated, currentUser, initializeUser]);
+
     // Map Convex user to our User type
     const user: User | null = currentUser ? {
-        id: currentUser.tokenIdentifier,
+        id: currentUser.tokenIdentifier || currentUser._id,
         _id: currentUser._id,
         email: currentUser.email,
         name: currentUser.name,

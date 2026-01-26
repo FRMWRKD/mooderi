@@ -76,7 +76,31 @@ export const saveMessage = internalMutation({
 });
 
 /**
- * Clear chat history
+ * Log user action (internal)
+ */
+export const logUserAction = internalMutation({
+  args: {
+    userId: v.id("users"),
+    imageId: v.optional(v.id("images")),
+    actionType: v.union(
+      v.literal("like"),
+      v.literal("dislike"),
+      v.literal("favorite"),
+      v.literal("copy_prompt"),
+      v.literal("generate_prompt")
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("userActions", {
+      userId: args.userId,
+      imageId: args.imageId,
+      actionType: args.actionType,
+    });
+  },
+});
+
+/**
+ * Clear chat history (internal)
  */
 export const clearHistory = internalMutation({
   args: { userId: v.id("users") },
@@ -85,12 +109,87 @@ export const clearHistory = internalMutation({
       .query("agentMessages")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
-    
+
     for (const msg of messages) {
       await ctx.db.delete(msg._id);
     }
-    
+
     return { deleted: messages.length };
+  },
+});
+
+/**
+ * Clear chat history (public mutation for UI)
+ * TC-10: Allows users to start a new conversation
+ */
+export const clearChatHistory = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const messages = await ctx.db
+      .query("agentMessages")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const msg of messages) {
+      await ctx.db.delete(msg._id);
+    }
+
+    return { success: true, deleted: messages.length };
+  },
+});
+
+/**
+ * Copy prompt from chat (charges 1 credit)
+ * Logs the action to userActions table
+ */
+export const copyPromptFromChat = mutation({
+  args: {
+    userId: v.id("users"),
+    messageId: v.id("agentMessages"),
+  },
+  handler: async (ctx, args) => {
+    // Get user
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+
+    // Check credits (skip for unlimited subscribers)
+    const creditCost = 1;
+    const currentCredits = user.credits ?? 0;
+
+    if (!user.isUnlimitedSubscriber) {
+      if (currentCredits < creditCost) {
+        return {
+          success: false,
+          error: "Insufficient credits",
+          remainingCredits: currentCredits,
+        };
+      }
+
+      // Deduct credits
+      await ctx.db.patch(args.userId, {
+        credits: currentCredits - creditCost,
+        totalCreditsUsed: (user.totalCreditsUsed ?? 0) + creditCost,
+      });
+    }
+
+    // Get the message to find image IDs
+    const message = await ctx.db.get(args.messageId);
+    const imageId = message?.imageIds?.[0];
+
+    // Log to userActions
+    await ctx.db.insert("userActions", {
+      userId: args.userId,
+      imageId: imageId,
+      actionType: "copy_prompt",
+    });
+
+
+    return {
+      success: true,
+      remainingCredits: user.isUnlimitedSubscriber ? currentCredits : currentCredits - creditCost,
+    };
   },
 });
 
@@ -132,11 +231,27 @@ export const generateImagePrompt = action({
     const image = await ctx.runQuery(api.images.getById, { id: args.imageId });
     if (!image) throw new Error("Image not found");
     
-    // Check if image already has prompts
+    // Check if image already has prompts (still charges 1 credit to retrieve)
     if (image.generatedPrompts?.text_to_image) {
-      // Use existing prompt
+      // Use existing prompt but still charge credits
       const prompt = image.generatedPrompts.text_to_image;
-      
+      const cachedCreditCost = 1;
+
+      // Deduct credits for cached prompts (unless unlimited subscriber)
+      if (!user.isUnlimitedSubscriber) {
+        await ctx.runMutation(api.users.deductCredits, {
+          userId: args.userId,
+          amount: cachedCreditCost,
+        });
+      }
+
+      // Log to userActions
+      await ctx.runMutation(internal.promptAgent.logUserAction, {
+        userId: args.userId,
+        imageId: args.imageId,
+        actionType: "generate_prompt",
+      });
+
       // Save to chat history
       await ctx.runMutation(internal.promptAgent.saveMessage, {
         userId: args.userId,
@@ -144,14 +259,14 @@ export const generateImagePrompt = action({
         content: prompt,
         imageIds: [args.imageId],
         promptType: "single",
-        creditsUsed: 0, // No credits for cached prompts
+        creditsUsed: cachedCreditCost,
       });
       
       return {
         success: true,
         prompt,
         cached: true,
-        creditsUsed: 0,
+        creditsUsed: cachedCreditCost,
       };
     }
     

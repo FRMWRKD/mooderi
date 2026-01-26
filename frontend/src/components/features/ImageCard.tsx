@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Grid3X3, ChevronDown, Check, Plus, Loader2 } from "lucide-react";
+import { Search, Grid3X3, ChevronDown, Check, Plus, Loader2, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     Dropdown,
@@ -30,6 +30,9 @@ interface ImageCardProps {
     hasGif?: boolean;
     isSelected?: boolean;
     onSelect?: () => void;
+    // Board context - for showing remove option in board view
+    boardId?: string;
+    onRemoveFromBoard?: (imageId: string) => void;
 }
 
 export function ImageCard({
@@ -42,15 +45,31 @@ export function ImageCard({
     hasGif = false,
     isSelected: controlledSelected,
     onSelect,
+    boardId,
+    onRemoveFromBoard,
 }: ImageCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [localSelected, setLocalSelected] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
     const router = useRouter();
 
     // Use controlled selection if provided, otherwise use local state
     const isSelected = controlledSelected !== undefined ? controlledSelected : localSelected;
     const handleSelect = onSelect || (() => setLocalSelected(!localSelected));
+
+    // Handle remove from board with confirmation
+    const handleRemoveFromBoard = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (onRemoveFromBoard && typeof id === 'string') {
+            if (confirm("Remove this image from the board? (The image will remain in your library)")) {
+                setIsRemoving(true);
+                onRemoveFromBoard(id);
+            }
+        }
+    };
 
     const handleDragStart = (e: React.DragEvent) => {
         e.dataTransfer.setData("application/x-image-id", id.toString());
@@ -112,8 +131,23 @@ export function ImageCard({
                         </span>
                     )}
 
-                    {/* Top Right Actions - Only shows board save button */}
+                    {/* Top Right Actions */}
                     <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Remove from Board Button - Only shown in board context */}
+                        {boardId && onRemoveFromBoard && (
+                            <button
+                                onClick={handleRemoveFromBoard}
+                                disabled={isRemoving}
+                                className="flex items-center gap-1 px-2 py-1.5 bg-red-500/90 backdrop-blur-lg rounded-full text-sm font-medium text-white hover:bg-red-600 transition-all disabled:opacity-50"
+                                title="Remove from board"
+                            >
+                                {isRemoving ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <X className="w-3.5 h-3.5" />
+                                )}
+                            </button>
+                        )}
                         {/* Save to Board Dropdown */}
                         <SaveToBoardDropdown imageId={id} />
                     </div>

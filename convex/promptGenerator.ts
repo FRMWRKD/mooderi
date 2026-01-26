@@ -167,17 +167,18 @@ export const generatePrompt = action({
     }
 
     // ============================================
-    // RATE LIMITING (Landing page only)
+    // RATE LIMITING
     // ============================================
     if (args.source === "landing") {
+      // Guest rate limiting (IP-based)
       const rateLimitKey = args.clientKey || "anonymous";
-      
-      // Check minute limit
+
+      // Check minute limit (1/minute for guests)
       const minuteResult = await rateLimiter.limit(ctx, "landingPromptGenMinute", {
         key: rateLimitKey,
         throws: false,
       });
-      
+
       if (!minuteResult.ok) {
         return {
           success: false,
@@ -193,13 +194,13 @@ export const generatePrompt = action({
           },
         };
       }
-      
-      // Check hourly limit
+
+      // Check hourly limit (3/hour for guests)
       const hourResult = await rateLimiter.limit(ctx, "landingPromptGenHour", {
         key: rateLimitKey,
         throws: false,
       });
-      
+
       if (!hourResult.ok) {
         return {
           success: false,
@@ -207,13 +208,67 @@ export const generatePrompt = action({
           topMatch: null,
           recommendations: [],
           visionatiAnalysis: null,
-          error: "Hourly limit reached. Sign in for unlimited access!",
+          error: "Hourly limit reached (3 per hour for guests). Sign in for more access!",
           rateLimitInfo: {
             minuteRemaining: 0,
             hourRemaining: 0,
             retryAfterSeconds: Math.ceil((hourResult.retryAfter || 3600000) / 1000),
           },
         };
+      }
+    } else if (args.source === "app" && args.userId) {
+      // Authenticated user rate limiting (user ID-based)
+      const rateLimitKey = args.userId;
+
+      // Check if user is unlimited subscriber (bypasses rate limits)
+      const user = await ctx.runQuery(api.users.getById, { id: args.userId });
+      const isUnlimited = user?.isUnlimitedSubscriber &&
+        (!user.subscriptionExpiresAt || user.subscriptionExpiresAt > Date.now());
+
+      if (!isUnlimited) {
+        // Check minute limit (5/minute for authenticated users)
+        const minuteResult = await rateLimiter.limit(ctx, "userPromptGenMinute", {
+          key: rateLimitKey,
+          throws: false,
+        });
+
+        if (!minuteResult.ok) {
+          return {
+            success: false,
+            generatedPrompt: "",
+            topMatch: null,
+            recommendations: [],
+            visionatiAnalysis: null,
+            error: "Rate limit exceeded. Please wait a moment before trying again.",
+            rateLimitInfo: {
+              minuteRemaining: 0,
+              hourRemaining: 0,
+              retryAfterSeconds: Math.ceil((minuteResult.retryAfter || 60000) / 1000),
+            },
+          };
+        }
+
+        // Check hourly limit (20/hour for authenticated users)
+        const hourResult = await rateLimiter.limit(ctx, "userPromptGenHour", {
+          key: rateLimitKey,
+          throws: false,
+        });
+
+        if (!hourResult.ok) {
+          return {
+            success: false,
+            generatedPrompt: "",
+            topMatch: null,
+            recommendations: [],
+            visionatiAnalysis: null,
+            error: "Hourly limit reached (20 per hour). Upgrade to unlimited for more access!",
+            rateLimitInfo: {
+              minuteRemaining: 0,
+              hourRemaining: 0,
+              retryAfterSeconds: Math.ceil((hourResult.retryAfter || 3600000) / 1000),
+            },
+          };
+        }
       }
     }
 
@@ -235,24 +290,30 @@ export const generatePrompt = action({
 
     let creditsToCharge = finalImageUrl ? 2 : 1;
     
+    // Debug: [generatePrompt] Credit check - source: ${args.source}, userId: ${args.userId}, creditsNeeded: ${creditsToCharge}`);
+    
     if (args.source === "app" && args.userId) {
       const user = await ctx.runQuery(api.users.getById, { id: args.userId });
+      // Debug: [generatePrompt] User credits: ${user?.credits ?? 'user not found'}`);
       if (!user) {
         throw new Error("User not found");
       }
       if ((user.credits || 0) < creditsToCharge) {
+        // Debug: [generatePrompt] Insufficient credits - returning error`);
         return {
           success: false,
           generatedPrompt: "",
           topMatch: null,
           recommendations: [],
           visionatiAnalysis: null,
-          error: `Not enough credits. You need ${creditsToCharge} credits for this operation.`,
+          error: `Not enough credits. You need ${creditsToCharge} credits but you have ${user.credits || 0}. Please purchase more credits.`,
         };
       }
+    } else {
+      // Debug: [generatePrompt] Skipping credit check - source: ${args.source}, hasUserId: ${!!args.userId}`);
     }
 
-    console.log(`[generatePrompt] Starting - source: ${args.source}, hasImage: ${!!finalImageUrl}`);
+    // Debug: [generatePrompt] Starting - source: ${args.source}, hasImage: ${!!finalImageUrl}`);
 
     // ============================================
     // STEP 1: Image Analysis (if image provided)
@@ -266,7 +327,7 @@ export const generatePrompt = action({
     let textForEmbedding = args.text || "";
 
     if (finalImageUrl && visionatiKey) {
-      console.log("[generatePrompt] Step 1: Analyzing image with Visionati...");
+      // Debug: [generatePrompt] Step 1: Analyzing image with Visionati...");
       
       if (args.clientKey) {
         await ctx.runMutation(internal.progressStore.updateProgress, {
@@ -312,7 +373,7 @@ export const generatePrompt = action({
 
           // Handle async polling
           if (visionatiResult.response_uri) {
-            console.log("[generatePrompt] Polling Visionati async response...");
+            // Debug: [generatePrompt] Polling Visionati async response...");
             const pollUrl = visionatiResult.response_uri;
             let attempts = 0;
             const maxAttempts = 30;
@@ -326,24 +387,56 @@ export const generatePrompt = action({
 
               if (pollResp.ok) {
                 const pollResult = await pollResp.json();
-                if (pollResult.all?.assets) {
+                // Debug: [generatePrompt] Poll attempt ${attempts + 1}: status=${pollResult.status}, hasAll=${!!pollResult.all}, hasAssets=${!!pollResult.all?.assets}`);
+                
+                // Check various response structures
+                if (pollResult.all?.assets || pollResult.assets || pollResult.all?.descriptions || pollResult.descriptions) {
                   visionatiResult = pollResult;
+                  // Debug: [generatePrompt] Visionati polling complete");
                   break;
                 }
+                
+                // Check if still processing
+                if (pollResult.status === 'pending' || pollResult.status === 'processing') {
+                  attempts++;
+                  continue;
+                }
+                
+                // If we got a result with data but different structure, use it
+                if (pollResult.all || pollResult.status === 'completed' || pollResult.status === 'success') {
+                  visionatiResult = pollResult;
+                  // Debug: [generatePrompt] Visionati polling complete (alt structure)");
+                  break;
+                }
+              } else {
+                // Debug: [generatePrompt] Poll attempt ${attempts + 1} failed: ${pollResp.status}`);
               }
               attempts++;
+            }
+            
+            if (attempts >= maxAttempts) {
+              // Debug: [generatePrompt] Visionati polling timed out after max attempts");
             }
           }
 
           // Parse response
-          const allData = visionatiResult.all || {};
+          const allData = visionatiResult.all || visionatiResult || {};
           let description = '';
           
+          // Try multiple paths to find the description
           if (allData.assets?.[0]?.descriptions?.[0]?.description) {
             description = allData.assets[0].descriptions[0].description;
           } else if (allData.descriptions?.[0]?.description) {
             description = allData.descriptions[0].description;
+          } else if (allData.assets?.[0]?.description) {
+            description = allData.assets[0].description;
+          } else if (typeof allData.description === 'string') {
+            description = allData.description;
+          } else if (visionatiResult.description) {
+            description = visionatiResult.description;
           }
+          
+          // Debug: [generatePrompt] Visionati description found: ${description ? 'yes (' + description.length + ' chars)' : 'no'}`);
 
           // Try to parse structured JSON
           if (description) {
@@ -356,11 +449,48 @@ export const generatePrompt = action({
               const jsonMatch = cleanedPrompt.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
+                
+                // Handle colors - check if it's the new format with dominant array
+                let parsedColors: string[] = [];
+                if (parsed.colors) {
+                  if (parsed.colors.dominant && Array.isArray(parsed.colors.dominant)) {
+                    parsedColors = parsed.colors.dominant;
+                  } else if (Array.isArray(parsed.colors)) {
+                    parsedColors = parsed.colors;
+                  } else if (typeof parsed.colors === 'object') {
+                    parsedColors = Object.keys(parsed.colors);
+                  }
+                }
+                
+                // Handle lighting - normalize object to string if needed
+                let parsedLighting: string | undefined;
+                if (parsed.lighting) {
+                  if (typeof parsed.lighting === 'string') {
+                    parsedLighting = parsed.lighting;
+                  } else if (typeof parsed.lighting === 'object') {
+                    // Extract type or combine object properties into a readable string
+                    const lightingObj = parsed.lighting;
+                    parsedLighting = lightingObj.type || 
+                      [lightingObj.quality, lightingObj.direction].filter(Boolean).join(', ') ||
+                      'mixed';
+                  }
+                }
+                
+                // Handle mood - normalize object to string if needed
+                let parsedMood: string | undefined;
+                if (parsed.mood) {
+                  if (typeof parsed.mood === 'string') {
+                    parsedMood = parsed.mood;
+                  } else if (typeof parsed.mood === 'object') {
+                    parsedMood = parsed.mood.overall || parsed.mood.type || JSON.stringify(parsed.mood);
+                  }
+                }
+                
                 visionatiAnalysis = {
                   short_description: parsed.short_description,
-                  mood: parsed.mood,
-                  lighting: parsed.lighting,
-                  colors: parsed.colors,
+                  mood: parsedMood,
+                  lighting: parsedLighting,
+                  colors: parsedColors,
                 };
                 textForEmbedding = parsed.short_description || description;
               }
@@ -374,13 +504,23 @@ export const generatePrompt = action({
           // Extract colors from Visionati if not in JSON
           if (!visionatiAnalysis?.colors) {
             const colorData = allData.assets?.[0]?.colors || allData.colors || {};
-            const extractedColors = Object.keys(colorData).slice(0, 5);
+            let extractedColors: string[] = [];
+            
+            // Handle new Visionati API format where colors is an object with dominant array
+            if (colorData.dominant && Array.isArray(colorData.dominant)) {
+              extractedColors = colorData.dominant.slice(0, 5);
+            } else if (typeof colorData === 'object' && !Array.isArray(colorData)) {
+              extractedColors = Object.keys(colorData).slice(0, 5);
+            } else if (Array.isArray(colorData)) {
+              extractedColors = colorData.slice(0, 5);
+            }
+            
             if (visionatiAnalysis) {
               visionatiAnalysis.colors = extractedColors;
             }
           }
 
-          console.log("[generatePrompt] Visionati analysis complete:", visionatiAnalysis);
+          // Debug: [generatePrompt] Visionati analysis complete:", visionatiAnalysis);
         }
       } catch (e) {
         console.error("[generatePrompt] Visionati error:", e);
@@ -402,7 +542,7 @@ export const generatePrompt = action({
     // ============================================
     // STEP 2: Generate embedding for RAG
     // ============================================
-    console.log("[generatePrompt] Step 2: Generating embedding...");
+    // Debug: [generatePrompt] Step 2: Generating embedding...");
     
     if (args.clientKey) {
       await ctx.runMutation(internal.progressStore.updateProgress, {
@@ -430,7 +570,7 @@ export const generatePrompt = action({
       if (embeddingResponse.ok) {
         const embeddingData = await embeddingResponse.json();
         embedding = embeddingData.embedding?.values || null;
-        console.log("[generatePrompt] Embedding generated:", embedding ? `${embedding.length} dimensions` : 'failed');
+        // Debug: [generatePrompt] Embedding generated:", embedding ? `${embedding.length} dimensions` : 'failed');
       }
     } catch (e) {
       console.error("[generatePrompt] Embedding error:", e);
@@ -439,7 +579,7 @@ export const generatePrompt = action({
     // ============================================
     // STEP 3: RAG - Find similar images
     // ============================================
-    console.log("[generatePrompt] Step 3: Vector search for similar images...");
+    // Debug: [generatePrompt] Step 3: Vector search for similar images...");
     
     if (args.clientKey) {
       await ctx.runMutation(internal.progressStore.updateProgress, {
@@ -484,7 +624,7 @@ export const generatePrompt = action({
         
         // Apply ranking algorithm
         ragResults = applyRankingAlgorithm(uniqueResults as any);
-        console.log("[generatePrompt] Found", ragResults.length, "similar images");
+        // Debug: [generatePrompt] Found", ragResults.length, "similar images");
 
         if (args.clientKey) {
           await ctx.runMutation(internal.progressStore.updateProgress, {
@@ -521,7 +661,7 @@ export const generatePrompt = action({
     // ============================================
     // STEP 5: Call Straico to generate prompt
     // ============================================
-    console.log("[generatePrompt] Step 5: Generating prompt with Straico...");
+    // Debug: [generatePrompt] Step 5: Generating prompt with Straico...");
     
     if (args.clientKey) {
       await ctx.runMutation(internal.progressStore.updateProgress, {
@@ -545,12 +685,12 @@ export const generatePrompt = action({
       // Priority 1: User-selected category
       if (args.categoryKey) {
         effectiveCategoryKey = args.categoryKey;
-        console.log(`[generatePrompt] Using user-selected category: ${args.categoryKey}`);
+        // Debug: [generatePrompt] Using user-selected category: ${args.categoryKey}`);
       } 
       // Priority 2: Auto-detect from Visionati analysis (when image analyzed)
       else if (visionatiAnalysis) {
         effectiveCategoryKey = detectCategoryFromVisionati(visionatiAnalysis);
-        console.log(`[generatePrompt] Auto-detected category from Visionati: ${effectiveCategoryKey}`);
+        // Debug: [generatePrompt] Auto-detected category from Visionati: ${effectiveCategoryKey}`);
       }
       
       // Load category details and examples
@@ -574,9 +714,9 @@ export const generatePrompt = action({
             source: e.source,
           }));
           
-          console.log(`[generatePrompt] Loaded category "${category.name}" with ${categoryExamples.length} top examples`);
+          // Debug: [generatePrompt] Loaded category "${category.name}" with ${categoryExamples.length} top examples`);
         } else {
-          console.log(`[generatePrompt] Category "${effectiveCategoryKey}" not found or inactive, using generic`);
+          // Debug: [generatePrompt] Category "${effectiveCategoryKey}" not found or inactive, using generic`);
         }
       }
 
@@ -588,12 +728,12 @@ export const generatePrompt = action({
         ? `category_${effectiveCategoryKey}_v1` 
         : "prompt_generator_v1";
       
-      console.log(`[generatePrompt] Loading system prompt: ${promptId}`);
+      // Debug: [generatePrompt] Loading system prompt: ${promptId}`);
       let dbPrompt = await ctx.runQuery(api.systemPrompts.getByPromptId, { promptId });
       
       // Fallback to generic if category prompt not found
       if (!dbPrompt?.content && effectiveCategoryKey) {
-        console.log("[generatePrompt] Category prompt not found, using generic");
+        // Debug: [generatePrompt] Category prompt not found, using generic");
         dbPrompt = await ctx.runQuery(api.systemPrompts.getByPromptId, { 
           promptId: "prompt_generator_v1" 
         });
@@ -656,7 +796,7 @@ Generate a prompt that matches the style and quality of the top-rated examples a
         message: `${dbPrompt.content}\n\n${userMessage}`,
       };
 
-      console.log("[generatePrompt] Straico request body:", JSON.stringify(straicoRequestBody, null, 2).substring(0, 500));
+      // Debug: [generatePrompt] Straico request body:", JSON.stringify(straicoRequestBody, null, 2).substring(0, 500));
 
       const straicoRes = await fetch('https://api.straico.com/v1/prompt/completion', {
         method: 'POST',
@@ -687,7 +827,7 @@ Generate a prompt that matches the style and quality of the top-rated examples a
           generatedPrompt = choices[0].message.content.trim();
           // Clean up if it has quotes or extra formatting
           generatedPrompt = generatedPrompt.replace(/^["']|["']$/g, '').trim();
-          console.log("[generatePrompt] Prompt generated successfully");
+          // Debug: [generatePrompt] Prompt generated successfully");
         }
       } else {
         const errorBody = await straicoRes.text();
@@ -716,7 +856,7 @@ Generate a prompt that matches the style and quality of the top-rated examples a
     // ============================================
     // STEP 6: Save request and deduct credits
     // ============================================
-    console.log("[generatePrompt] Step 6: Saving request...");
+    // Debug: [generatePrompt] Step 6: Saving request...");
     
     // Deduct credits for app users
     if (args.source === "app" && args.userId) {
@@ -741,7 +881,7 @@ Generate a prompt that matches the style and quality of the top-rated examples a
       creditsUsed: args.source === "app" ? creditsToCharge : undefined,
     });
 
-    console.log("[generatePrompt] Complete!");
+    // Debug: [generatePrompt] Complete!");
     
     if (args.clientKey) {
       await ctx.runMutation(internal.progressStore.updateProgress, {
