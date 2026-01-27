@@ -12,6 +12,9 @@ clean-deploy/
 # Frontend build artifact (copied from root for Vercel)
 # Note: frontend/convex/ must be tracked for Vercel deployment
 
+
+./claude/
+
 # Python
 __pycache__/
 *.py[cod]
