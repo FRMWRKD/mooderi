@@ -394,55 +394,90 @@ export const approveFrames = mutation({
  * Analyze approved frames in the background
  * This is called after approveFrames to trigger AI analysis
  * Processes images in parallel with concurrency limit to avoid timeout
+ * Also migrates images to R2 CDN for better performance
  */
 export const analyzeApprovedFrames = action({
   args: {
     imageIds: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const CONCURRENCY_LIMIT = 5; // Process 5 images at a time for faster throughput
-    const results: { imageId: string; success: boolean; error?: string }[] = [];
-    
+    const CONCURRENCY_LIMIT = 3; // Reduced for R2 migration + analysis
+    const results: { imageId: string; success: boolean; migrated?: boolean; error?: string }[] = [];
+
+    // Check if R2 is configured
+    const r2Configured = await ctx.runQuery(api.r2Storage.isConfigured);
+
     // Helper to process a single image
     const processImage = async (imageId: string) => {
       try {
-        const image = await ctx.runQuery(api.images.getById, { 
-          id: imageId as any 
+        const image = await ctx.runQuery(api.images.getById, {
+          id: imageId as any
         });
-        
+
         if (!image) {
-          console.error(`Image ${imageId} not found`);
           return { imageId, success: false, error: "Image not found" };
         }
-        
+
         if (!image.imageUrl) {
-          console.error(`Image ${imageId} has no URL`);
           return { imageId, success: false, error: "Image has no URL" };
         }
-        
-        // Trigger analysis - don't await to allow parallel processing
-        await ctx.runAction(api.ai.analyzeImage, { 
+
+        let finalImageUrl = image.imageUrl;
+        let migrated = false;
+
+        // Migrate to R2 if configured and not already on R2
+        if (r2Configured && !image.r2Key && !image.imageUrl.includes("r2.dev") && !image.imageUrl.includes("r2.cloudflarestorage")) {
+          try {
+            // Upload to R2 from source URL
+            const r2Result = await ctx.runAction(api.r2Storage.uploadFromUrl, {
+              sourceUrl: image.imageUrl,
+              prefix: "frames",
+            });
+
+            // Update image with R2 URL
+            await ctx.runMutation(api.images.updateImageUrl, {
+              imageId: imageId as any,
+              imageUrl: r2Result.publicUrl,
+              r2Key: r2Result.fileKey,
+            });
+
+            finalImageUrl = r2Result.publicUrl;
+            migrated = true;
+          } catch (r2Error: any) {
+            // R2 migration failed, continue with original URL
+            console.error(`R2 migration failed for ${imageId}:`, r2Error.message);
+          }
+        }
+
+        // Trigger AI analysis with the final URL
+        await ctx.runAction(api.ai.analyzeImage, {
           imageId: imageId as any,
-          imageUrl: image.imageUrl,
+          imageUrl: finalImageUrl,
         });
-        return { imageId, success: true };
+
+        return { imageId, success: true, migrated };
       } catch (error: any) {
-        console.error(`Failed to analyze image ${imageId}:`, error);
+        console.error(`Failed to process image ${imageId}:`, error);
         return { imageId, success: false, error: error.message };
       }
     };
-    
+
     // Process in batches with concurrency limit
     for (let i = 0; i < args.imageIds.length; i += CONCURRENCY_LIMIT) {
       const batch = args.imageIds.slice(i, i + CONCURRENCY_LIMIT);
-      // Debug: [analyzeApprovedFrames] Processing batch ${Math.floor(i/CONCURRENCY_LIMIT) + 1}, images: ${batch.length}`);
-      
       const batchResults = await Promise.all(batch.map(processImage));
       results.push(...batchResults);
     }
-    
-    // Debug: [analyzeApprovedFrames] Completed: ${results.filter(r => r.success).length}/${results.length} succeeded`);
-    return { results };
+
+    const migratedCount = results.filter(r => r.migrated).length;
+    return {
+      results,
+      summary: {
+        total: results.length,
+        success: results.filter(r => r.success).length,
+        migrated: migratedCount,
+      }
+    };
   },
 });
 

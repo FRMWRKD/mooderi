@@ -465,6 +465,28 @@ export const updateVisibility = mutation({
 });
 
 /**
+ * Update image URL (for R2 migration)
+ * Called when migrating images to Cloudflare R2 CDN
+ */
+export const updateImageUrl = mutation({
+  args: {
+    imageId: v.id("images"),
+    imageUrl: v.string(),
+    r2Key: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const updateData: { imageUrl: string; r2Key?: string } = {
+      imageUrl: args.imageUrl,
+    };
+    if (args.r2Key) {
+      updateData.r2Key = args.r2Key;
+    }
+    await ctx.db.patch(args.imageId, updateData);
+    return { success: true };
+  },
+});
+
+/**
  * Bulk update visibility
  * Migrated from: bulk_update_visibility RPC
  */
