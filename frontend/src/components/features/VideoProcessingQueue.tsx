@@ -250,19 +250,25 @@ export function VideoProcessingQueue() {
                 </div>
             )}
 
-            {/* Frame Selection Modal - DISABLED: TopBar handles this now */}
-            {/* <FrameSelectionModal
-                isOpen={showFrameModal}
-                onClose={() => setShowFrameModal(false)}
-                jobId={selectedJobId || ""}
-                frames={pendingFrames}
-                videoUrl={pendingVideoUrl}
-                onComplete={() => {
-                    setShowFrameModal(false);
-                    setPendingFrames([]);
-                    setSelectedJobId(null);
-                }}
-            /> */}
+            {/* Frame Selection Modal for manual review */}
+            {showFrameModal && selectedJobId && pendingFrames.length > 0 && (
+                <FrameSelectionModal
+                    isOpen={showFrameModal}
+                    onClose={() => {
+                        setShowFrameModal(false);
+                        setPendingFrames([]);
+                        setSelectedJobId(null);
+                    }}
+                    jobId={selectedJobId}
+                    frames={pendingFrames}
+                    videoUrl={pendingVideoUrl}
+                    onComplete={() => {
+                        setShowFrameModal(false);
+                        setPendingFrames([]);
+                        setSelectedJobId(null);
+                    }}
+                />
+            )}
         </div>
     );
 }
