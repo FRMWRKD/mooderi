@@ -690,7 +690,8 @@ export const generateSmartBoard = action({
     }
 
     // 1. Generate embedding for the prompt
-    const response = await fetchWithRetry(
+    // Try text-embedding-004 first, fall back to embedding-001
+    let response = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
       {
         method: "POST",
@@ -702,8 +703,24 @@ export const generateSmartBoard = action({
       }
     );
 
+    // Fallback to embedding-001 if text-embedding-004 fails
     if (!response.ok) {
-      throw new Error(`Embedding API error: ${response.status}`);
+      response = await fetchWithRetry(
+        `https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=${googleApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "models/embedding-001",
+            content: { parts: [{ text: args.prompt.substring(0, 2000) }] },
+          }),
+        }
+      );
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Embedding API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
