@@ -520,16 +520,31 @@ export const analyze = action({
 
     // Check for errors in the result
     if (result.status === "failed" || result.errors?.length > 0) {
-      const errorMsg = result.errors?.join(", ") || result.message || "Processing failed";
+      const rawError = result.errors?.join(", ") || result.message || "Processing failed";
+
+      // Convert technical errors to user-friendly messages
+      let userFriendlyError = rawError;
+      if (rawError.includes("cookies are no longer valid") || rawError.includes("YouTube account cookies")) {
+        userFriendlyError = "YouTube is temporarily unavailable. Our team has been notified and is working to fix this. Please try again later or use a different video source.";
+      } else if (rawError.includes("rate limit") || rawError.includes("Too Many Requests")) {
+        userFriendlyError = "Too many requests. Please wait a few minutes before trying again.";
+      } else if (rawError.includes("Video unavailable") || rawError.includes("Private video")) {
+        userFriendlyError = "This video is unavailable or private. Please try a different video.";
+      } else if (rawError.includes("Sign in to confirm") || rawError.includes("age-restricted")) {
+        userFriendlyError = "This video requires sign-in or is age-restricted. Please try a different video.";
+      } else if (rawError.includes("not a valid URL") || rawError.includes("Unsupported URL")) {
+        userFriendlyError = "Invalid video URL. Please enter a valid YouTube or Vimeo link.";
+      }
+
       const failResult = await ctx.runMutation(api.videos.updateStatus, {
         id: args.videoId,
         status: "failed",
-        errorMessage: errorMsg,
+        errorMessage: userFriendlyError,
       });
       if (failResult.cancelled) {
         return { status: "cancelled", message: "Video analysis was cancelled" };
       }
-      throw new Error(errorMsg);
+      throw new Error(userFriendlyError);
     }
 
     // Check if we got no frames
