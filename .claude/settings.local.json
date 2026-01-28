@@ -18,7 +18,9 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nsecurity: Remove exposed credentials and add frontend/convex for Vercel\n\n- Deleted temp_key.txt \\(private key\\)\n- Removed hardcoded env vars from frontend/vercel.json\n- Added frontend/convex/ for Vercel deployment \\(fixes build error\\)\n- Enhanced .gitignore to prevent future credential leaks\n\nIMPORTANT: Rotate these exposed credentials:\n- Supabase anon key \\(in vercel.json history\\)\n- Any keys in config.py, debug_embeddings.py, modal_video_processor.py\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Update convex imports to use @convex alias for Vercel build\n\nChanged relative imports \\(../../../convex/\\) to alias imports \\(@convex/\\)\nto work with the frontend/convex folder structure.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(CONVEX_DEPLOYMENT=prod:amiable-raccoon-559 npx convex deploy:*)",
+      "Bash(node --version:*)"
     ]
   }
 }

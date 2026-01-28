@@ -89,6 +89,35 @@ export default function ImageDetailPage({
     const [isCopyingPrompt, setIsCopyingPrompt] = useState(false);
     const [showLoginPrompt, setShowLoginPrompt] = useState(false);
     const [showNoCreditsMessage, setShowNoCreditsMessage] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    // Download image properly (handles cross-origin URLs)
+    const handleDownload = async () => {
+        if (!image?.imageUrl) return;
+
+        setIsDownloading(true);
+        try {
+            const response = await fetch(image.imageUrl);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            // Extract filename from URL or use image ID
+            const urlParts = image.imageUrl.split("/");
+            const filename = urlParts[urlParts.length - 1].split("?")[0] || `image-${imageId}.jpg`;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Download failed:", error);
+            // Fallback: open in new tab
+            window.open(image.imageUrl, "_blank");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     const copyToClipboard = async (text: string, isPromptCopy: boolean = false) => {
         // TC-6: Guest trying to copy prompt - prompt for login
@@ -334,11 +363,19 @@ export default function ImageDetailPage({
                             >
                                 <Share2 className="w-4 h-4" />
                             </Button>
-                            <a href={image.imageUrl} download target="_blank" rel="noopener noreferrer">
-                                <Button variant="secondary" size="icon" title="Download">
+                            <Button
+                                variant="secondary"
+                                size="icon"
+                                title="Download"
+                                onClick={handleDownload}
+                                disabled={isDownloading}
+                            >
+                                {isDownloading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
                                     <Download className="w-4 h-4" />
-                                </Button>
-                            </a>
+                                )}
+                            </Button>
                         </div>
 
                         {/* Collapsible Tabs */}

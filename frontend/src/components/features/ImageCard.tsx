@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Grid3X3, ChevronDown, Check, Plus, Loader2, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CachedImage } from "@/components/ui/CachedImage";
 import {
     Dropdown,
     DropdownTrigger,
@@ -95,12 +96,12 @@ export function ImageCard({
         >
             <Link href={`/image/${id}`}>
                 <div className="relative overflow-hidden bg-black border border-white/20 transition-all duration-300 hover:border-white/50">
-                    {/* Image */}
-                    <img
+                    {/* Image - Uses in-memory cache for instant re-renders */}
+                    <CachedImage
                         src={imageUrl}
                         alt={prompt || "Moodboard image"}
-                        className="w-full h-auto object-cover"
-                        loading="lazy"
+                        className="w-full h-auto"
+                        placeholderColor={colors?.[0] || "#1a1a1a"}
                     />
 
                     {/* Selection Checkbox */}

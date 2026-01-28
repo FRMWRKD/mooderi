@@ -20,8 +20,8 @@ import {
     DropdownItem,
     DropdownSeparator,
 } from "@/components/ui/Dropdown";
-import { useState, useEffect, useCallback } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,9 +36,20 @@ export function TopBar() {
     // Auth
     const { user } = useAuth();
 
-    // Search state
-    const [searchQuery, setSearchQuery] = useState("");
-    const [isSemanticSearch, setIsSemanticSearch] = useState(false);
+    // Search state - sync with URL params
+    const searchParams = useSearchParams();
+    const urlQuery = searchParams.get("q") || "";
+    const urlType = searchParams.get("type") || "text";
+
+    const [searchQuery, setSearchQuery] = useState(urlQuery);
+    const [isSemanticSearch, setIsSemanticSearch] = useState(urlType === "semantic");
+    const isInitialMount = useRef(true);
+
+    // Sync search input with URL params when they change (e.g., from FilterBar or navigation)
+    useEffect(() => {
+        setSearchQuery(urlQuery);
+        setIsSemanticSearch(urlType === "semantic");
+    }, [urlQuery, urlType]);
 
     // Video modal state
     const [videoUrl, setVideoUrl] = useState("");
@@ -74,7 +85,7 @@ export function TopBar() {
     const [showFrameSelection, setShowFrameSelection] = useState(false);
     const [pendingFrames, setPendingFrames] = useState<string[]>([]);
     const [pendingVideoUrl, setPendingVideoUrl] = useState("");
-    
+
     // Track videos that have already been shown in frame selection modal
     // Uses sessionStorage to persist across page navigations
     const getShownVideoIds = useCallback((): Set<string> => {
@@ -86,7 +97,7 @@ export function TopBar() {
             return new Set();
         }
     }, []);
-    
+
     const markVideoAsShown = useCallback((videoId: string) => {
         if (typeof window === 'undefined') return;
         try {
@@ -186,15 +197,15 @@ export function TopBar() {
                     qualityMode: quality
                 });
                 console.log("[TopBar] analyzeVideo result:", analyzeResult);
-                
+
                 // Analysis completed - check if we got frames back
                 if (analyzeResult.status === "pending_approval" && analyzeResult.selected_frames?.length > 0) {
                     // Mark this video as shown to prevent re-showing
                     markVideoAsShown(videoId);
-                    
+
                     // Update job status in context to show completion
                     updateJobStatus(videoId, "pending_approval", "Ready for review!");
-                    
+
                     // Show frame selection modal directly
                     const frameUrls = analyzeResult.selected_frames.map((f: any) => f.url);
                     setPendingFrames(frameUrls);
@@ -245,11 +256,38 @@ export function TopBar() {
         setError(null);
     };
 
+    // Debounced search - update URL as user types
+    useEffect(() => {
+        // Skip on initial mount to avoid duplicate navigation
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        // Only update URL if we're on the home page
+        if (pathname !== "/") return;
+
+        const timer = setTimeout(() => {
+            const type = isSemanticSearch ? "semantic" : "text";
+            if (searchQuery.trim()) {
+                router.push(`/?q=${encodeURIComponent(searchQuery)}&type=${type}`, { scroll: false });
+            } else if (urlQuery) {
+                // Clear URL when search is emptied
+                router.push("/", { scroll: false });
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, isSemanticSearch, pathname, router, urlQuery]);
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
+        const type = isSemanticSearch ? "semantic" : "text";
         if (searchQuery.trim()) {
-            const type = isSemanticSearch ? "semantic" : "text";
             router.push(`/?q=${encodeURIComponent(searchQuery)}&type=${type}`);
+        } else {
+            // Clear URL when submitting empty search
+            router.push("/");
         }
     };
 

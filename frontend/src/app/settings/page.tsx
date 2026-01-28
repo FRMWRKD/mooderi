@@ -15,11 +15,8 @@ export default function SettingsPage() {
     const { user: authUser, signOut, isLoading: isAuthLoading } = useAuth();
     const router = useRouter();
 
-    // Convex hooks - use Supabase user ID to look up Convex user
-    const userData = useQuery(
-        api.users.getBySupabaseId,
-        authUser?.id ? { supabaseId: authUser.id } : "skip"
-    );
+    // Convex hooks - get current authenticated user
+    const userData = useQuery(api.users.getCurrent);
     const activityData = useQuery(api.users.getActivity, {});
     const updateProfile = useMutation(api.users.updateProfile);
 
@@ -67,7 +64,7 @@ export default function SettingsPage() {
         setSaveSuccess(false);
 
         try {
-            await updateProfile({ supabaseId: authUser?.id, name: name });
+            await updateProfile({ name: name });
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2000);
         } catch (error) {
@@ -265,20 +262,20 @@ export default function SettingsPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {activities.map((activity: any) => (
-                                        <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
+                                        <div key={activity._id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
                                             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                                                {activity.action_type === 'video_processed' && <Video className="w-4 h-4" />}
-                                                {activity.action_type === 'image_saved' && <Image className="w-4 h-4" />}
-                                                {activity.action_type === 'board_created' && <FolderPlus className="w-4 h-4" />}
-                                                {activity.action_type === 'search' && <Search className="w-4 h-4" />}
-                                                {!['video_processed', 'image_saved', 'board_created', 'search'].includes(activity.action_type) && <History className="w-4 h-4" />}
+                                                {activity.actionType === 'video_processed' && <Video className="w-4 h-4" />}
+                                                {activity.actionType === 'image_saved' && <Image className="w-4 h-4" />}
+                                                {activity.actionType === 'board_created' && <FolderPlus className="w-4 h-4" />}
+                                                {activity.actionType === 'search' && <Search className="w-4 h-4" />}
+                                                {!['video_processed', 'image_saved', 'board_created', 'search'].includes(activity.actionType || '') && <History className="w-4 h-4" />}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium">
-                                                    {activity.action_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                                    {(activity.actionType || 'action').replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                                 </p>
                                                 <p className="text-xs text-text-tertiary">
-                                                    {new Date(activity.created_at).toLocaleString()}
+                                                    {new Date(activity._creationTime).toLocaleString()}
                                                 </p>
                                             </div>
                                         </div>

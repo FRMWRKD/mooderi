@@ -28,7 +28,7 @@ const rag = new RAG(components.rag, {
     // v2 specification for AI SDK 5 compatibility
     specificationVersion: "v2" as const,
     provider: "google",
-    modelId: "text-embedding-004",
+    modelId: "gemini-embedding-001",
     maxEmbeddingsPerCall: 100,
     supportsParallelCalls: true,
     doEmbed: async ({ values }: { values: string[] }) => {
@@ -38,14 +38,15 @@ const rag = new RAG(components.rag, {
       const embeddings = await Promise.all(
         values.map(async (text: string) => {
           const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleApiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                model: "models/text-embedding-004",
+                model: "models/gemini-embedding-001",
                 content: { parts: [{ text }] },
                 taskType: "RETRIEVAL_DOCUMENT",
+                outputDimensionality: 768,
               }),
             }
           );
@@ -70,7 +71,7 @@ const rag = new RAG(components.rag, {
       };
     },
   } as any, // Type cast required for @convex-dev/rag AI SDK v2 compatibility - custom embedding interface
-  embeddingDimension: 768, // Google text-embedding-004 outputs 768 dimensions
+  embeddingDimension: 768, // Google gemini-embedding-001 outputs 768 dimensions
   filterNames: ["mood", "lighting", "sourceType"],
 });
 

@@ -32,17 +32,17 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, in
   for (let i = 0; i <= retries; i++) {
     try {
       const res = await fetch(url, options);
-      
+
       // Success
       if (res.ok) return res;
-      
+
       // Don't retry client errors (4xx) except Rate Limit (429)
       if (res.status < 500 && res.status !== 429) {
         return res;
       }
-      
+
       console.warn(`[fetchWithRetry] Request failed (${res.status}). Attempt ${i + 1}/${retries + 1}. Retrying in ${backoff}ms...`);
-      
+
     } catch (e: any) {
       lastError = e;
       console.warn(`[fetchWithRetry] Network error (${e.message}). Attempt ${i + 1}/${retries + 1}. Retrying in ${backoff}ms...`);
@@ -190,7 +190,7 @@ export const analyzeImage = action({
       key: rateLimitKey,
       throws: false,
     });
-    
+
     if (!ok) {
       // Debug: [analyzeImage] Rate limited. Retry after ${retryAfter}ms`);
       throw new Error(`Rate limit exceeded. Please wait ${Math.ceil((retryAfter || 60000) / 1000)} seconds.`);
@@ -300,7 +300,7 @@ export const analyzeImage = action({
     } else {
       const desc = allData.descriptions || [];
       visionatiDescription = desc.length > 0 ? desc[0].description : '';
-      
+
       const colorData = allData.colors || {};
       // Handle new Visionati API format where colors is an object with dominant array
       if (colorData.dominant && Array.isArray(colorData.dominant)) {
@@ -310,7 +310,7 @@ export const analyzeImage = action({
       } else if (Array.isArray(colorData)) {
         colors = colorData.slice(0, 5);
       }
-      
+
       tags = Object.keys(allData.tags || {}).slice(0, 10);
     }
 
@@ -343,13 +343,14 @@ export const analyzeImage = action({
       try {
         // Debug: [analyzeImage] Step 2: Generating embedding...");
         const embeddingResponse = await fetchWithRetry(
-          `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: 'models/text-embedding-004',
+              model: 'models/gemini-embedding-001',
               content: { parts: [{ text: visionatiDescription.substring(0, 2000) }] },
+              outputDimensionality: 768,
             }),
           }
         );
@@ -383,13 +384,13 @@ export const analyzeImage = action({
 
         // Try to load category-specific system prompt
         let systemPrompt = await getSystemPrompt(ctx, `category_${detectedCategory}_v1`);
-        
+
         // Fallback to generic if category prompt not found
         if (!systemPrompt) {
           // Debug: [analyzeImage] No category-specific prompt for ${detectedCategory}, using generic`);
           systemPrompt = await getSystemPrompt(ctx, 'straico_v1');
         }
-        
+
         if (!systemPrompt) {
           console.error("[analyzeImage] CRITICAL: No system prompt found in database");
           throw new Error("System prompt not configured in database.");
@@ -417,23 +418,23 @@ export const analyzeImage = action({
           // Include top-rated examples as context
           top_rated_examples: categoryExamples.length > 0
             ? categoryExamples.map((e, i) => ({
-                rank: i + 1,
-                prompt: e.promptText,
-                rating: e.rating,
-              }))
+              rank: i + 1,
+              prompt: e.promptText,
+              rating: e.rating,
+            }))
             : undefined,
         };
 
         // Build user message with examples context
         let userMessage = `DETECTED STYLE: ${detectedCategory.replace('_', ' ').toUpperCase()}\n\n`;
-        
+
         if (categoryExamples.length > 0) {
           userMessage += `TOP RATED EXAMPLES FOR THIS STYLE (learn from these):\n`;
           categoryExamples.forEach((e, i) => {
             userMessage += `Example ${i + 1} (Rating: ${e.rating}/100): ${e.promptText}\n\n`;
           });
         }
-        
+
         userMessage += `INPUT ANALYSIS:\n${JSON.stringify(inputData, null, 2)}`;
 
         const straicoRes = await fetchWithRetry('https://api.straico.com/v1/prompt/completion', {
@@ -471,7 +472,7 @@ export const analyzeImage = action({
 
               const jsonStart = content.indexOf('{');
               const jsonEnd = content.lastIndexOf('}');
-              
+
               if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
                 // Found JSON - parse it
                 const jsonContent = content.substring(jsonStart, jsonEnd + 1);
@@ -605,7 +606,7 @@ export const analyzeImage = action({
 // Generate Search Embedding
 // ============================================
 export const generateSearchEmbedding = action({
-  args: { 
+  args: {
     text: v.string(),
     userId: v.optional(v.string()), // For rate limiting
   },
@@ -622,20 +623,21 @@ export const generateSearchEmbedding = action({
         key: args.userId,
         throws: false,
       });
-      
+
       if (!ok) {
         throw new Error(`Search rate limit exceeded. Please wait ${Math.ceil((retryAfter || 60000) / 1000)} seconds.`);
       }
     }
 
     const response = await fetchWithRetry(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "models/text-embedding-004",
+          model: "models/gemini-embedding-001",
           content: { parts: [{ text: args.text.substring(0, 2000) }] },
+          outputDimensionality: 768,
         }),
       }
     );
@@ -683,61 +685,65 @@ export const generateSmartBoard = action({
         key: args.userId,
         throws: false,
       });
-      
+
       if (!ok) {
         throw new Error(`Smart board rate limit exceeded. Please wait ${Math.ceil((retryAfter || 60000) / 1000)} seconds.`);
       }
     }
 
-    // 1. Generate embedding for the prompt
-    // Try text-embedding-004 first, fall back to embedding-001
-    let response = await fetchWithRetry(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "models/text-embedding-004",
-          content: { parts: [{ text: args.prompt.substring(0, 2000) }] },
-        }),
-      }
-    );
+    // 1. Generate embedding for the prompt using Google's gemini-embedding-001 model
+    let embedding: number[] | null = null;
+    let embeddingError = "";
 
-    // Fallback to embedding-001 if text-embedding-004 fails
-    if (!response.ok) {
-      response = await fetchWithRetry(
-        `https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=${googleApiKey}`,
+    try {
+      console.log("[generateSmartBoard] Calling embedding API with gemini-embedding-001...");
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleApiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "models/embedding-001",
+            model: "models/gemini-embedding-001",
             content: { parts: [{ text: args.prompt.substring(0, 2000) }] },
+            outputDimensionality: 768,
           }),
         }
       );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.embedding?.values) {
+          embedding = data.embedding.values;
+          console.log("[generateSmartBoard] Embedding generated successfully:", embedding.length, "dimensions");
+        } else {
+          embeddingError = "No embedding values in response";
+          console.error("[generateSmartBoard] Response missing embedding values:", JSON.stringify(data));
+        }
+      } else {
+        const errorText = await response.text();
+        embeddingError = `API returned ${response.status}: ${errorText}`;
+        console.error("[generateSmartBoard] Embedding API error:", response.status, errorText);
+
+        // Provide helpful guidance based on error
+        if (response.status === 404) {
+          console.error("[generateSmartBoard] 404 Error - The Generative Language API may not be enabled for your Google Cloud project.");
+          console.error("[generateSmartBoard] To fix: 1) Go to console.cloud.google.com 2) Enable 'Generative Language API' 3) Or get a new key from aistudio.google.com/app/apikey");
+        } else if (response.status === 403) {
+          console.error("[generateSmartBoard] 403 Error - API key may be invalid or restricted.");
+        }
+      }
+    } catch (e: any) {
+      embeddingError = e.message;
+      console.error("[generateSmartBoard] Network/fetch error:", e.message);
     }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Embedding API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const embedding = data.embedding?.values;
-
+    // If no embedding could be generated, throw an error with helpful message
     if (!embedding) {
-      return {
-        board: {
-          id: "temp-smart-" + Date.now(),
-          name: args.prompt,
-          images: [],
-          prompt: args.prompt,
-          isSmartBoard: true,
-        },
-        images: [],
-        count: 0,
-      };
+      console.error("[generateSmartBoard] Failed to generate embedding:", embeddingError);
+      throw new Error(
+        `Smart Board unavailable: ${embeddingError}. To fix: Enable the "Generative Language API" in Google Cloud Console, or get a new API key from aistudio.google.com`
+      );
     }
 
     // 2. Perform vector search

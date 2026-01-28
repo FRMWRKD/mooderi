@@ -69,75 +69,204 @@ export const getById = query({
  * Filter images by mood, lighting, tags, etc.
  * Migrated from: GET /api/images/filter
  */
+// Helper: Parse hex color to RGB
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  // Remove # if present
+  hex = hex.replace(/^#/, "");
+  if (hex.length === 3) {
+    hex = hex.split("").map((c) => c + c).join("");
+  }
+  if (hex.length !== 6) return null;
+  const num = parseInt(hex, 16);
+  if (isNaN(num)) return null;
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+}
+
+// Helper: Calculate color distance (Euclidean in RGB space)
+function colorDistance(hex1: string, hex2: string): number {
+  const rgb1 = hexToRgb(hex1);
+  const rgb2 = hexToRgb(hex2);
+  if (!rgb1 || !rgb2) return Infinity;
+  const dr = rgb1.r - rgb2.r;
+  const dg = rgb1.g - rgb2.g;
+  const db = rgb1.b - rgb2.b;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+// Helper: Check if image has matching color within tolerance
+function imageMatchesColor(imageColors: string[], filterColor: string, tolerance: number): boolean {
+  // Tolerance mapping: 50=Exact (threshold 30), 100=Similar (threshold 80), 200=Loose (threshold 150)
+  const thresholds: Record<number, number> = {
+    50: 30,   // Very close match
+    100: 80,  // Similar shades
+    200: 150, // Loose match
+  };
+  const threshold = thresholds[tolerance] ?? 80;
+
+  return imageColors.some((imgColor) => {
+    const distance = colorDistance(filterColor, imgColor);
+    return distance <= threshold;
+  });
+}
+
 export const filter = query({
   args: {
     mood: v.optional(v.array(v.string())),
     lighting: v.optional(v.array(v.string())),
     tags: v.optional(v.array(v.string())),
+    colors: v.optional(v.array(v.string())), // Hex colors to filter by
+    colorTolerance: v.optional(v.number()), // 50=Exact, 100=Similar, 200=Loose
+    cameraShots: v.optional(v.array(v.string())), // Camera shot types to filter by
     sourceType: v.optional(v.string()),
     sort: v.optional(v.string()),
     limit: v.optional(v.number()),
+    offset: v.optional(v.number()), // For infinite scroll pagination
     onlyPublic: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     const limit = Math.min(args.limit ?? 50, 100);
-    
+    const offset = args.offset ?? 0;
+    const colorTolerance = args.colorTolerance ?? 100;
+
+    // Check if any filters are active
+    const hasFilters = (args.mood && args.mood.length > 0) ||
+                       (args.lighting && args.lighting.length > 0) ||
+                       (args.tags && args.tags.length > 0) ||
+                       (args.colors && args.colors.length > 0) ||
+                       (args.cameraShots && args.cameraShots.length > 0) ||
+                       args.sourceType === "video_import";
+
+    // Determine how many images to fetch
+    // If filters are active, we need more images to ensure enough filtered results
+    // If no filters, we can use efficient direct pagination
+    const fetchLimit = hasFilters ? 2000 : (offset + limit + 1);
+
     // Fetch images based on filter type
     let allImages: Doc<"images">[];
-    
+
     if (args.userId && args.onlyPublic === false) {
       // User's own images
       allImages = await ctx.db
         .query("images")
         .withIndex("by_user", (q) => q.eq("userId", args.userId!))
         .order("desc")
-        .take(500);
+        .take(fetchLimit);
     } else {
       // Public images (default)
       allImages = await ctx.db
         .query("images")
         .withIndex("by_public", (q) => q.eq("isPublic", true))
         .order("desc")
-        .take(500);
+        .take(fetchLimit);
     }
-    
+
     let filtered = allImages;
-    
+
     // Apply filters
     if (args.mood && args.mood.length > 0) {
-      filtered = filtered.filter(img => 
-        img.mood && args.mood!.includes(img.mood)
-      );
-    }
-    
-    if (args.lighting && args.lighting.length > 0) {
-      filtered = filtered.filter(img => 
-        img.lighting && args.lighting!.includes(img.lighting)
-      );
-    }
-    
-    if (args.tags && args.tags.length > 0) {
+      const moodsLower = args.mood.map(m => m.toLowerCase());
       filtered = filtered.filter(img =>
-        img.tags && args.tags!.some(tag => img.tags!.includes(tag))
+        img.mood && moodsLower.includes(img.mood.toLowerCase())
       );
     }
-    
+
+    if (args.lighting && args.lighting.length > 0) {
+      const lightingLower = args.lighting.map(l => l.toLowerCase());
+      filtered = filtered.filter(img =>
+        img.lighting && lightingLower.includes(img.lighting.toLowerCase())
+      );
+    }
+
+    if (args.tags && args.tags.length > 0) {
+      const tagsLower = args.tags.map(t => t.toLowerCase());
+      filtered = filtered.filter(img =>
+        img.tags && tagsLower.some(tag =>
+          img.tags!.map(t => t.toLowerCase()).includes(tag)
+        )
+      );
+    }
+
+    // Apply color filtering
+    if (args.colors && args.colors.length > 0) {
+      filtered = filtered.filter(img => {
+        if (!img.colors || img.colors.length === 0) return false;
+        // Image must match at least one of the selected colors
+        return args.colors!.some(filterColor =>
+          imageMatchesColor(img.colors!, filterColor, colorTolerance)
+        );
+      });
+    }
+
+    // Apply camera shot filtering
+    if (args.cameraShots && args.cameraShots.length > 0) {
+      const cameraShotsLower = args.cameraShots.map(c => c.toLowerCase());
+      filtered = filtered.filter(img => {
+        if (!img.cameraShot) return false;
+        // Check if image camera shot contains any of the selected camera shots
+        const imgCameraLower = img.cameraShot.toLowerCase();
+        return cameraShotsLower.some(shot => imgCameraLower.includes(shot) || shot.includes(imgCameraLower));
+      });
+    }
+
     if (args.sourceType === "video_import") {
       filtered = filtered.filter(img => img.sourceVideoUrl != null);
     }
-    
+
     // Apply sorting
-    if (args.sort === "ranked" || args.sort === "rating") {
-      filtered = filtered.sort((a, b) => 
-        (b.aestheticScore ?? 0) - (a.aestheticScore ?? 0)
-      );
+    switch (args.sort) {
+      case "newest":
+        // Default order from DB is already desc by _creationTime, but ensure it
+        filtered = filtered.sort((a, b) =>
+          (b._creationTime ?? 0) - (a._creationTime ?? 0)
+        );
+        break;
+      case "oldest":
+        filtered = filtered.sort((a, b) =>
+          (a._creationTime ?? 0) - (b._creationTime ?? 0)
+        );
+        break;
+      case "popular":
+        // Sort by likes (engagement)
+        filtered = filtered.sort((a, b) =>
+          ((b.likes ?? 0) - (b.dislikes ?? 0)) - ((a.likes ?? 0) - (a.dislikes ?? 0))
+        );
+        break;
+      case "ranked":
+      case "rating":
+        // Sort by aesthetic score
+        filtered = filtered.sort((a, b) =>
+          (b.aestheticScore ?? 0) - (a.aestheticScore ?? 0)
+        );
+        break;
+      case "random":
+        // Shuffle the array
+        for (let i = filtered.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+        }
+        break;
+      default:
+        // Default to newest first
+        filtered = filtered.sort((a, b) =>
+          (b._creationTime ?? 0) - (a._creationTime ?? 0)
+        );
     }
-    
+
+    // Apply offset-based pagination
+    const totalFiltered = filtered.length;
+    const paginatedResults = filtered.slice(offset, offset + limit);
+    const hasMore = offset + limit < totalFiltered;
+
     return {
-      images: filtered.slice(0, limit),
-      count: filtered.length,
-      hasMore: filtered.length > limit,
+      images: paginatedResults,
+      count: totalFiltered,
+      hasMore,
+      offset: offset,
     };
   },
 });
@@ -164,13 +293,22 @@ export const getFilterOptions = query({
     const allTags = images.flatMap(i => i.tags ?? []);
     const tagSet = new Set(allTags);
     const tags = Array.from(tagSet).sort();
-    
+
+    // Extract unique colors from images
+    const allColors = images.flatMap(i => i.colors ?? []);
+    const colorSet = new Set(allColors);
+    const colors = Array.from(colorSet);
+
+    // Extract unique camera shots
+    const cameraSet = new Set(images.map(i => i.cameraShot).filter((c): c is string => Boolean(c)));
+    const camera_shots = Array.from(cameraSet).sort();
+
     return {
       moods,
       lighting,
       tags,
-      colors: [], // Not used currently
-      camera_shots: [], // Not used currently
+      colors,
+      camera_shots,
       total_images: images.length,
     };
   },
@@ -187,21 +325,26 @@ export const textSearch = query({
   },
   handler: async (ctx, args) => {
     const limit = Math.min(args.limit ?? 50, 100);
-    
+
     if (!args.query.trim()) {
-      return { images: [], count: 0 };
+      return { images: [], count: 0, hasMore: false };
     }
-    
+
+    // Fetch one extra to determine if there are more results
     const results = await ctx.db
       .query("images")
       .withSearchIndex("search_prompt", (q) =>
         q.search("prompt", args.query).eq("isPublic", true)
       )
-      .take(limit);
-    
+      .take(limit + 1);
+
+    const hasMore = results.length > limit;
+    const images = hasMore ? results.slice(0, limit) : results;
+
     return {
-      images: results,
-      count: results.length,
+      images,
+      count: images.length,
+      hasMore,
       type: "text",
     };
   },
@@ -718,13 +861,14 @@ export const searchByText = action({
 
     // 1. Generate embedding for query
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${googleApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "models/text-embedding-004",
+          model: "models/gemini-embedding-001",
           content: { parts: [{ text: args.query.substring(0, 2000) }] },
+          outputDimensionality: 768,
         }),
       }
     );

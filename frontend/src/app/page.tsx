@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/layout";
 import { ImageCard, FilterBar, type FilterState, NewBoardModal, LandingPage, SortDropdown } from "@/components/features";
 import { Button } from "@/components/ui/Button";
+import { CachedImage, useImagePreloader } from "@/components/ui/CachedImage";
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 // import { api, type Image, type Board, type Video } from "@/lib/api"; // Legacy
 import { api } from "@convex/_generated/api";
@@ -79,11 +80,11 @@ function HomePageContent() {
         mood: activeFilters.moods.length > 0 ? activeFilters.moods : undefined,
         lighting: activeFilters.lighting.length > 0 ? activeFilters.lighting : undefined,
         tags: activeFilters.tags.length > 0 ? activeFilters.tags : undefined,
+        colors: activeFilters.colors.length > 0 ? activeFilters.colors : undefined,
+        colorTolerance: activeFilters.colors.length > 0 ? activeFilters.colorTolerance : undefined,
+        cameraShots: activeFilters.cameraShots.length > 0 ? activeFilters.cameraShots : undefined,
         sort: activeFilters.sort,
         limit: limit,
-        // colors/cameraShots not yet supported in convex filter query, logic passed down but backend ignores or we filter client side?
-        // Note: Backend filter only checks mood, lighting, tags. 
-        // We'll rely on backend filtering for now.
     };
 
     const searchArgs = {
@@ -97,15 +98,8 @@ function HomePageContent() {
     // Unified results
     const results = shouldSearch ? searchResults : filterResults;
     const images = results?.images || [];
-    // Only filterResults has 'hasMore' explicitly. searchResults has 'count'.
-    // Heuristic for search: if returned count == limit, maybe more?
-    const hasMoreFn = () => {
-        if (shouldSearch) {
-            return (results?.images?.length || 0) >= limit;
-        }
-        return (results as any)?.hasMore || false;
-    };
-    const hasMore = hasMoreFn();
+    // Both filter and textSearch now return hasMore flag
+    const hasMore = (results as any)?.hasMore || false;
     const isLoadingImages = results === undefined;
     const error = null; // Convex handles errors via boundary usually, or undefined result
 
@@ -121,6 +115,10 @@ function HomePageContent() {
     const dynamicCameraShots = filterOptionsData?.camera_shots || [];
     const dynamicTags = filterOptionsData?.tags || [];
     const isLoadingFilters = filterOptionsData === undefined;
+
+    // Preload images for instant rendering when switching between search/filter
+    const imageUrls = useMemo(() => images.map((img: any) => img.imageUrl), [images]);
+    useImagePreloader(imageUrls);
 
 
     // Batch selection state
@@ -395,10 +393,11 @@ function HomePageContent() {
                         {images.map((image: any) => (
                             <Link key={image._id} href={`/image/${image._id}`} className={viewMode === "list" ? "flex gap-5 p-4 bg-white/5 rounded-xl border border-border-subtle hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer" : ""}>
                                 {viewMode === "list" && (
-                                    <img
+                                    <CachedImage
                                         src={image.imageUrl}
                                         alt={image.prompt || ""}
-                                        className="w-28 h-28 object-cover rounded-lg flex-shrink-0"
+                                        className="w-28 h-28 rounded-lg flex-shrink-0"
+                                        placeholderColor={image.colors?.[0] || "#1a1a1a"}
                                     />
                                 )}
                                 {viewMode === "list" ? (

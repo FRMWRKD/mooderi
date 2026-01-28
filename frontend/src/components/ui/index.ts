@@ -27,3 +27,4 @@ export {
   DropdownRadioGroup,
 } from "./Dropdown";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
+export { CachedImage, useImagePreloader, preloadImages, isImageCached } from "./CachedImage";
