@@ -25,7 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
  */
 export function useImages(limit?: number) {
   const data = useQuery(api.images.list, { limit });
-  
+
   return {
     images: data?.images ?? [],
     hasMore: data?.hasMore ?? false,
@@ -41,7 +41,7 @@ export function useImage(imageId: Id<"images"> | null) {
     api.images.getById,
     imageId ? { id: imageId } : "skip"
   );
-  
+
   return {
     image: data ?? null,
     isLoading: data === undefined && imageId !== null,
@@ -62,7 +62,7 @@ export function useFilteredImages(filters: {
   userId?: Id<"users">;
 }) {
   const data = useQuery(api.images.filter, filters);
-  
+
   return {
     images: data?.images ?? [],
     count: data?.count ?? 0,
@@ -76,7 +76,7 @@ export function useFilteredImages(filters: {
  */
 export function useFilterOptions() {
   const data = useQuery(api.images.getFilterOptions, {});
-  
+
   return {
     moods: data?.moods ?? [],
     lighting: data?.lighting ?? [],
@@ -97,7 +97,7 @@ export function useTextSearch(query: string, limit?: number) {
     api.images.textSearch,
     query ? { query, limit } : "skip"
   );
-  
+
   return {
     images: data?.images ?? [],
     count: data?.count ?? 0,
@@ -112,17 +112,17 @@ export function useSemanticSearch(query: string, limit?: number) {
   const [images, setImages] = useState<Doc<"images">[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const searchAction = useAction(api.images.searchByText);
-  
+
   useEffect(() => {
     if (!query) {
       setImages([]);
       return;
     }
-    
+
     const timeoutId = setTimeout(() => {
       let isMounted = true;
       setIsLoading(true);
-      
+
       searchAction({ query, limit })
         .then((res) => {
           if (isMounted) {
@@ -130,18 +130,18 @@ export function useSemanticSearch(query: string, limit?: number) {
           }
         })
         .catch((err) => {
-          console.error("Semantic search failed:", err);
+          if (isMounted) console.error("Semantic search error:", err);
         })
         .finally(() => {
           if (isMounted) setIsLoading(false);
         });
-        
+
       return () => { isMounted = false; };
     }, 500); // Debounce
-      
+
     return () => clearTimeout(timeoutId);
   }, [query, limit]);
-  
+
   return {
     images,
     count: images.length,
@@ -157,7 +157,7 @@ export function useSimilarImages(imageId: Id<"images"> | null, limit?: number) {
     api.images.getSimilar,
     imageId ? { imageId, limit } : "skip"
   );
-  
+
   return {
     images: data?.images ?? [],
     count: data?.count ?? 0,
@@ -169,41 +169,41 @@ export function useSimilarImages(imageId: Id<"images"> | null, limit?: number) {
  * Get similar images using VECTOR SEARCH (Action)
  */
 export function useSimilarImagesVector(imageId: Id<"images"> | null, limit?: number) {
-  const [results, setResults] = useState<{images: Doc<"images">[], count: number}>({images: [], count: 0});
+  const [results, setResults] = useState<{ images: Doc<"images">[], count: number }>({ images: [], count: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const searchAction = useAction(api.images.searchSimilar);
-  
+
   useEffect(() => {
     if (!imageId) {
-      setResults({images: [], count: 0});
+      setResults({ images: [], count: 0 });
       return;
     }
-    
+
     let isMounted = true;
     setIsLoading(true);
-    
+
     searchAction({ imageId, limit })
       .then((res) => {
         if (isMounted && res) {
-           // Handle response which could be array or object depending on implementation
-           // My implementation returns { images, count }
-           if ('images' in res) {
-             setResults(res as any);
-           } else {
-             setResults({ images: res as any, count: (res as any).length });
-           }
+          // Handle response which could be array or object depending on implementation
+          // My implementation returns { images, count }
+          if ('images' in res) {
+            setResults(res as any);
+          } else {
+            setResults({ images: res as any, count: (res as any).length });
+          }
         }
       })
       .catch((err) => {
-        console.error("Vector search failed:", err);
+        if (isMounted) console.error("Vector search error:", err);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
       });
-      
+
     return () => { isMounted = false; };
   }, [imageId, limit]); // searchAction is stable
-  
+
   return {
     images: results.images,
     count: results.count,
@@ -216,7 +216,7 @@ export function useSimilarImagesVector(imageId: Id<"images"> | null, limit?: num
  */
 export function useRankedImages(limit?: number, offset?: number) {
   const data = useQuery(api.images.getRanked, { limit, offset });
-  
+
   return {
     images: data?.images ?? [],
     count: data?.count ?? 0,
@@ -250,7 +250,7 @@ export function useDeleteImage() {
  */
 export function useBoards(userId?: Id<"users">) {
   const data = useQuery(api.boards.list, { userId });
-  
+
   return {
     boards: data ?? [],
     isLoading: data === undefined,
@@ -262,7 +262,7 @@ export function useBoards(userId?: Id<"users">) {
  */
 export function usePublicBoards() {
   const data = useQuery(api.boards.list, { includePublic: true });
-  
+
   return {
     boards: data ?? [],
     isLoading: data === undefined,
@@ -277,7 +277,7 @@ export function useBoardWithImages(boardId: Id<"boards"> | null) {
     api.boards.getWithImages,
     boardId ? { boardId } : "skip"
   );
-  
+
   return {
     board: data ?? null,
     images: data?.images ?? [],
@@ -293,7 +293,7 @@ export function useSubfolders(parentId: Id<"boards"> | null) {
     api.boards.getSubfolders,
     parentId ? { parentId } : "skip"
   );
-  
+
   return {
     subfolders: data ?? [],
     isLoading: data === undefined && parentId !== null,
@@ -330,7 +330,7 @@ export function useRemoveFromBoard() {
  */
 export function useVideos(userId?: Id<"users">) {
   const data = useQuery(api.videos.list, { userId });
-  
+
   return {
     videos: data ?? [],
     isLoading: data === undefined,
@@ -345,7 +345,7 @@ export function useVideo(videoId: Id<"videos"> | null) {
     api.videos.getById,
     videoId ? { id: videoId } : "skip"
   );
-  
+
   return {
     video: data ?? null,
     isLoading: data === undefined && videoId !== null,
@@ -360,7 +360,7 @@ export function useVideoFrames(videoId: Id<"videos"> | null) {
     api.videos.getFrames,
     videoId ? { videoId } : "skip"
   );
-  
+
   return {
     frames: data ?? [],
     isLoading: data === undefined && videoId !== null,
@@ -397,7 +397,7 @@ export function useDeleteVideo() {
 export function useCurrentUser() {
   const { user } = useAuth();
   const data = useQuery(api.users.getBySupabaseId, user?.id ? { supabaseId: user.id } : "skip");
-  
+
   return {
     user: data ?? null,
     isLoading: data === undefined,
@@ -427,7 +427,7 @@ export function useUseCredits() {
  */
 export function useNotifications(limit?: number) {
   const data = useQuery(api.notifications.list, { limit });
-  
+
   return {
     notifications: data?.notifications ?? [],
     unreadCount: data?.unreadCount ?? 0,
@@ -470,16 +470,16 @@ export function useRagSearchPrompts() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchAction = useAction(api.rag.searchPrompts);
-  
+
   const search = async (query: string, options?: { limit?: number; mood?: string; lighting?: string }) => {
     if (!query.trim()) {
       setResults([]);
       return [];
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await searchAction({
         query,
@@ -496,7 +496,7 @@ export function useRagSearchPrompts() {
       setIsLoading(false);
     }
   };
-  
+
   return {
     search,
     results,
@@ -512,16 +512,16 @@ export function useFindSimilarPrompts(imageId: Id<"images"> | null, limit?: numb
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const findSimilarAction = useAction(api.rag.findSimilarPrompts);
-  
+
   useEffect(() => {
     if (!imageId) {
       setResults([]);
       return;
     }
-    
+
     let isMounted = true;
     setIsLoading(true);
-    
+
     findSimilarAction({ imageId, limit })
       .then((response) => {
         if (isMounted && response.success) {
@@ -529,15 +529,15 @@ export function useFindSimilarPrompts(imageId: Id<"images"> | null, limit?: numb
         }
       })
       .catch((err) => {
-        console.error("Find similar prompts failed:", err);
+        if (isMounted) console.error("Find similar prompts error:", err);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
       });
-    
+
     return () => { isMounted = false; };
   }, [imageId, limit]);
-  
+
   return {
     similarPrompts: results,
     isLoading,

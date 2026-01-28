@@ -106,7 +106,6 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
                 <FilterBar
                     onSearch={(query, type) => {
                         // Implement search if needed, or pass query to filter
-                        console.log("Search", query, type);
                     }}
                     onFilterChange={setFilters}
                     dynamicMoods={filterOptions?.moods || []}

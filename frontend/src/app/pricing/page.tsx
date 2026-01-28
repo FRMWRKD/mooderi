@@ -108,7 +108,7 @@ function CheckoutButton({
         setError(null);
 
         try {
-            console.log("[Checkout] Starting embedded checkout for product:", productId);
+
 
             // Get the current origin for embedded checkout
             const embedOrigin = window.location.origin;
@@ -119,10 +119,10 @@ function CheckoutButton({
                 embedOrigin,
             });
 
-            console.log("[Checkout] Result:", result);
+
 
             if (result?.checkoutUrl && result.checkoutUrl.startsWith('http')) {
-                console.log("[Checkout] Opening embedded checkout:", result.checkoutUrl);
+
 
                 // Create embedded checkout modal
                 const checkout = await PolarEmbedCheckout.create(result.checkoutUrl, { theme: 'dark' });
@@ -130,7 +130,7 @@ function CheckoutButton({
 
                 // Listen for checkout events
                 checkout.addEventListener('success', () => {
-                    console.log("[Checkout] Payment successful!");
+
                     // Wait for webhook to process before redirecting
                     setTimeout(() => {
                         window.location.href = `${embedOrigin}/pricing?success=true`;
@@ -138,22 +138,22 @@ function CheckoutButton({
                 });
 
                 checkout.addEventListener('close', () => {
-                    console.log("[Checkout] Checkout closed");
+
                     checkoutRef.current = null;
                     setIsLoading(false);
                 });
 
                 checkout.addEventListener('confirmed', () => {
-                    console.log("[Checkout] Payment confirmed, processing...");
+
                 });
 
             } else {
-                console.error("[Checkout] Invalid checkout URL:", result?.checkoutUrl);
+
                 setError("Failed to create checkout - invalid URL returned");
                 setIsLoading(false);
             }
         } catch (err: any) {
-            console.error("[Checkout] Error:", err);
+            console.error("Checkout error:", err);
             setError(err.message || "Failed to create checkout");
             setIsLoading(false);
         }
@@ -168,7 +168,7 @@ function CheckoutButton({
                 className={`block w-full py-3 text-center font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${popular
                     ? "bg-white text-black hover:bg-white/90"
                     : "border-2 border-white hover:bg-white hover:text-black"
-                }`}
+                    }`}
             >
                 {isLoading ? (
                     <span className="flex items-center justify-center gap-2">

@@ -296,8 +296,8 @@ export function ApiKeySettings({ isOpen, onClose }: ApiKeySettingsProps) {
                         {/* Test Result */}
                         {testResult && (
                             <div className={`p-4 rounded-xl border ${testResult.success
-                                    ? "bg-green-500/10 border-green-500/30"
-                                    : "bg-red-500/10 border-red-500/30"
+                                ? "bg-green-500/10 border-green-500/30"
+                                : "bg-red-500/10 border-red-500/30"
                                 }`}>
                                 <div className="flex items-center gap-2">
                                     {testResult.success ? (

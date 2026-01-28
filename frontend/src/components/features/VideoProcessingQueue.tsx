@@ -53,7 +53,7 @@ export function VideoProcessingQueue() {
                 alert("No frames available for review");
             }
         } catch (e) {
-            console.error("Failed to fetch frames", e);
+            console.error("Error loading frames:", e);
             alert("Failed to load frames for review");
         }
     };
@@ -64,23 +64,23 @@ export function VideoProcessingQueue() {
         setIsAdding(true);
         try {
             // 1. Create video record in Convex
-            console.log("[VideoQueue] Creating video record for:", newUrl);
+
             const result = await createVideo({ url: newUrl, qualityMode: quality });
-            console.log("[VideoQueue] Create result:", result);
-            
+
+
             if (result.success && result.id) {
                 // 2. Add to local queue context (for tracking)
                 const videoId = result.id;
                 addJob(videoId, newUrl);
-                console.log("[VideoQueue] Added job, triggering analyze for:", videoId);
+
 
                 // 3. Trigger Modal analysis via Action
                 try {
-                    console.log("[VideoQueue] Calling analyzeVideo action...");
+
                     const analyzeResult = await analyzeVideo({ videoId: videoId, videoUrl: newUrl, qualityMode: quality });
-                    console.log("[VideoQueue] Analyze result:", analyzeResult);
+
                 } catch (err: any) {
-                    console.error("[VideoQueue] Analysis trigger failed:", err);
+                    console.error("Error calling analyzeVideo:", err);
                     // Show error to user
                     alert(`Video analysis failed to start: ${err.message || err}`);
                 }
@@ -91,7 +91,7 @@ export function VideoProcessingQueue() {
                 alert("Failed to create video record");
             }
         } catch (e: any) {
-            console.error("[VideoQueue] Error:", e);
+            console.error("Error adding video:", e);
             alert(`Failed to add video: ${e.message || e}`);
         } finally {
             setIsAdding(false);

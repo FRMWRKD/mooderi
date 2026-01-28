@@ -44,13 +44,13 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
 
     // Check if R2 is configured
     const isR2Configured = useQuery(api.r2Storage.isConfigured);
-    
+
     // Convex hooks - legacy Convex Storage
     const generateUploadUrl = useMutation(api.images.generateUploadUrl);
-    
+
     // R2 upload action
     const generateR2UploadUrl = useAction(api.r2Storage.generatePresignedUploadUrl);
-    
+
     const createImage = useMutation(api.images.create);
     const analyzeImage = useAction(api.ai.analyzeImage);
 
@@ -112,8 +112,8 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
             // Use R2 if configured, otherwise fall back to Convex Storage
             if (isR2Configured) {
                 // ========== R2 UPLOAD FLOW ==========
-                console.log("[UploadModal] Using Cloudflare R2 storage");
-                
+
+
                 // 1. Get presigned upload URL from R2
                 const { uploadUrl, fileKey, publicUrl } = await generateR2UploadUrl({
                     contentType: file.type,
@@ -145,8 +145,8 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
                 });
             } else {
                 // ========== LEGACY CONVEX STORAGE FLOW ==========
-                console.log("[UploadModal] Using Convex Storage (R2 not configured)");
-                
+
+
                 // 1. Get short-lived upload URL
                 const postUrl = await generateUploadUrl();
 
@@ -189,12 +189,12 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
                         imageId: imageId,
                         imageUrl: finalImageUrl,
                     });
-                    console.log("[UploadModal] AI analysis triggered");
+
                 } else {
-                    console.warn("[UploadModal] Could not get image URL for analysis");
+
                 }
             } catch (analysisError) {
-                console.warn("[UploadModal] Analysis trigger failed (non-fatal):", analysisError);
+
             }
 
             setProgress(100);
@@ -208,7 +208,7 @@ export function UploadModal({ trigger, onImageUploaded }: UploadModalProps) {
             }, 1500);
 
         } catch (err) {
-            console.error("Upload error:", err);
+
             setError(err instanceof Error ? err.message : "Upload failed");
             setStatus("error");
         }

@@ -219,8 +219,8 @@ function ChatContent() {
                     >
                         <div
                             className={`max-w-[80%] ${message.role === "user"
-                                    ? "bg-white text-black"
-                                    : "bg-white/10 border border-white/20"
+                                ? "bg-white text-black"
+                                : "bg-white/10 border border-white/20"
                                 }`}
                         >
                             {/* Message Header */}
@@ -321,8 +321,8 @@ function ChatContent() {
                                                 key={image._id}
                                                 onClick={() => toggleImageSelection(image._id)}
                                                 className={`relative aspect-square border-2 transition-all ${selectedImages.includes(image._id)
-                                                        ? "border-white ring-2 ring-white/50"
-                                                        : "border-white/30 hover:border-white/60"
+                                                    ? "border-white ring-2 ring-white/50"
+                                                    : "border-white/30 hover:border-white/60"
                                                     }`}
                                             >
                                                 <img

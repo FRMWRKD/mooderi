@@ -102,7 +102,7 @@ export function SmartBoardModal({ trigger, onBoardCreated }: SmartBoardModalProp
             }, 1000);
 
         } catch (err) {
-            console.error("Save board error:", err);
+            console.error("Failed to save smart board:", err);
             setError(err instanceof Error ? err.message : "Failed to save board");
             setStatus("preview");
         }

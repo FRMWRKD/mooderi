@@ -201,8 +201,8 @@ export function VideoJobProvider({ children }: { children: ReactNode }) {
                 ...j,
                 status,
                 progress: status === "pending_approval" || status === "completed" ? 100 : j.progress,
-                stage: stage || (status === "pending_approval" ? "Ready for review!" : 
-                       status === "completed" ? "Complete!" : j.stage),
+                stage: stage || (status === "pending_approval" ? "Ready for review!" :
+                    status === "completed" ? "Complete!" : j.stage),
             };
         }));
     }, []);

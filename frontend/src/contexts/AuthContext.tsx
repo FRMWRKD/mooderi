@@ -33,7 +33,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
     // Get current user from Convex
     const currentUser = useQuery(api.users.getCurrent);
-    
+
     // Store/sync user profile info
     const storeUser = useMutation(api.users.store);
     // Initialize user credits if needed (only once per session)

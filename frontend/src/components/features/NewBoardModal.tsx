@@ -71,7 +71,7 @@ export function NewBoardModal({
                             imageId: imageIdToSave as any // Cast to Id<"images">
                         });
                     } else {
-                        console.warn("Cannot save Supabase image ID to Convex board:", imageIdToSave);
+                        // Legacy Supabase image IDs are skipped
                     }
                 }
 
@@ -83,7 +83,7 @@ export function NewBoardModal({
                 alert("Failed to create board");
             }
         } catch (error) {
-            console.error("Board creation exception:", error);
+            console.error("Failed to create board:", error);
             alert("An unexpected error occurred: " + (error instanceof Error ? error.message : "Unknown error"));
         } finally {
             setIsLoading(false);
