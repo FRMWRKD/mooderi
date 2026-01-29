@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Masonry } from "react-plock";
@@ -12,9 +12,11 @@ import {
     Sparkles,
     Trash2,
     RefreshCw,
-    MoreHorizontal
+    MoreHorizontal,
+    Coins
 } from "lucide-react";
 import { FilterBar, FilterState } from "./FilterBar";
+import { Id } from "@convex/_generated/dataModel";
 
 interface UserHistoryFeedProps {
     onSelectPrompt?: (prompt: string) => void;
@@ -25,6 +27,10 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [selectedImage, setSelectedImage] = useState<any>(null);
     const [copied, setCopied] = useState(false);
+    const [copyingPrompt, setCopyingPrompt] = useState(false);
+
+    // Mutation for copying prompts with credit deduction
+    const copyPromptMutation = useMutation(api.images.copyPrompt);
 
     // Filter State
     const [filters, setFilters] = useState<FilterState>({
@@ -57,10 +63,36 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
     // Fetch filter options
     const filterOptions = useQuery(api.images.getFilterOptions);
 
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async (imageId: Id<"images">, text: string) => {
+        if (copyingPrompt) return;
+
+        setCopyingPrompt(true);
+        try {
+            // Call mutation to deduct credit (C-4: Credit Consumption)
+            const result = await copyPromptMutation({ imageId });
+
+            if (result.success) {
+                // Only copy to clipboard if credit deduction succeeded
+                await navigator.clipboard.writeText(text);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                // Show error if insufficient credits
+                alert(result.error || "Failed to copy prompt");
+            }
+        } catch (error: any) {
+            console.error("Failed to copy prompt:", error);
+            // If user is not logged in, allow copy without credit
+            if (error.message?.includes("Not authenticated")) {
+                await navigator.clipboard.writeText(text);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                alert("Failed to copy prompt. Please try again.");
+            }
+        } finally {
+            setCopyingPrompt(false);
+        }
     };
 
     const handleReuse = (prompt: string) => {
@@ -163,18 +195,21 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.9 }}
-                            className="bg-[#0A0A0A] border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:flex-row rounded-xl shadow-2xl"
+                            className="bg-[#0A0A0A] border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row rounded-xl shadow-2xl"
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="md:w-1/2 bg-black flex items-center justify-center p-4">
+                            {/* Image Section - Fixed height on mobile, flexible on desktop */}
+                            <div className="md:w-1/2 bg-black flex items-center justify-center p-4 flex-shrink-0">
                                 <img
                                     src={selectedImage.imageUrl}
                                     alt="Generation"
-                                    className="max-h-full max-w-full object-contain rounded-lg"
+                                    className="max-h-[40vh] md:max-h-full max-w-full object-contain rounded-lg"
                                 />
                             </div>
-                            <div className="md:w-1/2 p-8 flex flex-col h-full overflow-y-auto">
-                                <div className="flex items-start justify-between mb-6">
+
+                            {/* Details Section - Scrollable */}
+                            <div className="md:w-1/2 p-6 md:p-8 flex flex-col min-h-0">
+                                <div className="flex items-start justify-between mb-6 flex-shrink-0">
                                     <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
                                         <Sparkles className="w-5 h-5 text-purple-400" />
                                         Details
@@ -184,14 +219,16 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
                                     </button>
                                 </div>
 
-                                <div className="space-y-6 flex-1">
+                                <div className="space-y-6 flex-1 overflow-y-auto">
+                                    {/* Prompt */}
                                     <div>
                                         <label className="text-xs uppercase tracking-widest text-white/50 mb-2 block">Prompt</label>
-                                        <div className="p-4 bg-white/5 rounded-lg border border-white/10 font-mono text-sm leading-relaxed">
+                                        <div className="p-4 bg-white/5 rounded-lg border border-white/10 font-mono text-sm leading-relaxed max-h-[200px] md:max-h-[300px] overflow-y-auto">
                                             {selectedImage.prompt}
                                         </div>
                                     </div>
 
+                                    {/* Metadata */}
                                     <div className="space-y-4">
                                         {selectedImage.mood && (
                                             <div>
@@ -207,13 +244,30 @@ export const UserHistoryFeed = ({ onSelectPrompt }: UserHistoryFeedProps) => {
                                         )}
                                     </div>
 
-                                    <div className="pt-6 border-t border-white/10 flex flex-wrap gap-3 mt-auto">
+                                    {/* Action Buttons */}
+                                    <div className="pt-6 border-t border-white/10 flex flex-wrap gap-3">
                                         <button
-                                            onClick={() => handleCopy(selectedImage.prompt || "")}
-                                            className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/10 hover:bg-white/20 transition-colors text-sm uppercase tracking-wider"
+                                            onClick={() => handleCopy(selectedImage._id, selectedImage.prompt || "")}
+                                            disabled={copyingPrompt}
+                                            className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/10 hover:bg-white/20 transition-colors text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                            {copied ? "Copied" : "Copy"}
+                                            {copyingPrompt ? (
+                                                <>
+                                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                                    Copying...
+                                                </>
+                                            ) : copied ? (
+                                                <>
+                                                    <Check className="w-4 h-4 text-green-400" />
+                                                    Copied!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-4 h-4" />
+                                                    Copy Prompt
+                                                    <span className="text-xs text-amber-400 ml-1">(1 credit)</span>
+                                                </>
+                                            )}
                                         </button>
                                         <button
                                             onClick={() => {

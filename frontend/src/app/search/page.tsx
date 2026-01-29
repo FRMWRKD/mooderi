@@ -38,14 +38,16 @@ function SearchContent() {
     // Determine which query to run
     const hasFilters = selectedColors.length > 0 || selectedMoods.length > 0 || selectedLighting.length > 0 || selectedCameraShots.length > 0 || selectedTags.length > 0;
 
-    // Filter Query Args
+    // Filter Query Args - Include all filter types
     const filterArgs = {
         mood: selectedMoods.length > 0 ? selectedMoods : undefined,
         lighting: selectedLighting.length > 0 ? selectedLighting : undefined,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
+        colors: selectedColors.length > 0 ? selectedColors : undefined,
+        colorTolerance: selectedColors.length > 0 ? parseInt(colorToleranceParam, 10) : undefined,
+        cameraShots: selectedCameraShots.length > 0 ? selectedCameraShots : undefined,
         limit: 100,
         sort: "ranked",
-        // Note: Backend might not support colors/camera/tolerance yet, matching Home Page logic
     };
 
     // Text Search Args

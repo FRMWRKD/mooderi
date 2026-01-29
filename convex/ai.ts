@@ -674,6 +674,9 @@ export const generateSmartBoard = action({
   }> => {
     const googleApiKey = process.env.GOOGLE_API_KEY;
     const count = args.count ?? 20;
+    // Strictness: 0.3 = loose (30%), 0.55 = default, 0.9 = strict (90%)
+    // We'll use this to filter results by similarity score
+    const strictness = args.strictness ?? 0.55;
 
     if (!googleApiKey) {
       throw new Error("Missing GOOGLE_API_KEY");
@@ -696,7 +699,7 @@ export const generateSmartBoard = action({
     let embeddingError = "";
 
     try {
-      console.log("[generateSmartBoard] Calling embedding API with gemini-embedding-001...");
+      console.log("[generateSmartBoard] Calling embedding API for prompt:", args.prompt);
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${googleApiKey}`,
@@ -746,19 +749,93 @@ export const generateSmartBoard = action({
       );
     }
 
-    // 2. Perform vector search
+    // 2. Perform vector search - fetch more than needed so we can filter by score
+    const fetchCount = Math.min(count * 3, 100); // Fetch 3x to allow filtering
     const results = await ctx.vectorSearch("images", "by_embedding", {
       vector: embedding,
-      limit: count,
+      limit: fetchCount,
       filter: (q) => q.eq("isPublic", true),
     });
 
-    // 3. Fetch full image documents
+    console.log("[generateSmartBoard] Vector search returned", results.length, "results");
+
+    // 3. Filter by strictness threshold and fetch full image documents
+    // Higher strictness = higher minimum score required
+    // Score from vectorSearch is typically 0-1 (cosine similarity)
+    const minScore = strictness * 0.5; // Convert 0.3-0.9 to 0.15-0.45 threshold
+
+    const filteredResults = results.filter(r => r._score >= minScore);
+    console.log("[generateSmartBoard] After strictness filter (minScore:", minScore, "):", filteredResults.length, "results");
+
+    // Sort by score (highest first) and take top `count`
+    let topResults = filteredResults
+      .sort((a, b) => b._score - a._score)
+      .slice(0, count);
+
+    // 4. If we don't have enough results, also try text search as fallback
+    if (topResults.length < count) {
+      console.log("[generateSmartBoard] Vector results insufficient, trying text search fallback...");
+      try {
+        // Use text search to find images with matching prompts
+        const textResults = await ctx.runQuery(api.images.textSearch, {
+          query: args.prompt,
+          limit: count - topResults.length,
+        });
+
+        if (textResults?.images && textResults.images.length > 0) {
+          // Get IDs we already have to avoid duplicates
+          const existingIds = new Set(topResults.map(r => r._id.toString()));
+
+          // Add text search results as fallback
+          const additionalImages = textResults.images
+            .filter((img: any) => !existingIds.has(img._id.toString()))
+            .slice(0, count - topResults.length);
+
+          console.log("[generateSmartBoard] Added", additionalImages.length, "images from text search fallback");
+
+          // Fetch and combine results - text search results don't have _score
+          const additionalDocs: (Doc<"images"> | null)[] = await Promise.all(
+            additionalImages.map((img: any) => ctx.runQuery(api.images.getById, { id: img._id }))
+          );
+
+          const validAdditional = additionalDocs.filter((img): img is Doc<"images"> => !!img);
+
+          // Fetch vector results
+          const vectorImages: (Doc<"images"> | null)[] = await Promise.all(
+            topResults.map((r) => ctx.runQuery(api.images.getById, { id: r._id }))
+          );
+          const validVectorImages = vectorImages.filter((img): img is Doc<"images"> => !!img);
+
+          const allImages = [...validVectorImages, ...validAdditional];
+
+          console.log("[generateSmartBoard] Returning", allImages.length, "images (vector + text fallback) for prompt:", args.prompt);
+
+          return {
+            board: {
+              id: "temp-smart-" + Date.now(),
+              name: args.prompt,
+              images: allImages.map((img) => img._id as Id<"images">),
+              prompt: args.prompt,
+              isSmartBoard: true,
+            },
+            images: allImages,
+            count: allImages.length,
+          };
+        }
+      } catch (textSearchError) {
+        console.error("[generateSmartBoard] Text search fallback failed:", textSearchError);
+        // Continue with vector results only
+      }
+    }
+
+    // 5. Fetch full image documents (standard path)
     const images: (Doc<"images"> | null)[] = await Promise.all(
-      results.map((r) => ctx.runQuery(api.images.getById, { id: r._id }))
+      topResults.map((r) => ctx.runQuery(api.images.getById, { id: r._id }))
     );
 
     const validImages: Doc<"images">[] = images.filter((img): img is Doc<"images"> => !!img);
+
+    console.log("[generateSmartBoard] Returning", validImages.length, "images for prompt:", args.prompt);
 
     return {
       board: {

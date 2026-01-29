@@ -153,32 +153,26 @@ export function ImageCard({
                         <SaveToBoardDropdown imageId={id} />
                     </div>
 
-                    {/* Mood & Colors Overlay - Only show on hover */}
+                    {/* Mood & Colors Overlay - Only show on hover, NOT clickable (clicks pass through to image link) */}
                     <div
                         className={cn(
                             "absolute bottom-3 left-3 right-3 flex items-center gap-2 transition-opacity z-10 pointer-events-none",
                             isHovered ? "opacity-100" : "opacity-0"
                         )}
                     >
+                        {/* Display mood/prompt text as decorative overlay - clicks pass through to image */}
                         {mood && (
-                            <Link
-                                href={`/search?mood=${encodeURIComponent(mood)}`}
-                                className="px-2.5 py-1 bg-black/80 border border-white/30 text-xs text-white hover:border-white transition-colors pointer-events-auto"
-                                onClick={(e) => e.stopPropagation()}
-                            >
+                            <span className="px-2.5 py-1 bg-black/80 border border-white/30 text-xs text-white max-w-[200px] truncate">
                                 {mood}
-                            </Link>
+                            </span>
                         )}
                         {colors.length > 0 && (
-                            <div className="flex gap-1.5 pointer-events-auto">
+                            <div className="flex gap-1.5">
                                 {colors.slice(0, 4).map((color, i) => (
-                                    <Link
+                                    <span
                                         key={i}
-                                        href={`/search?color=${encodeURIComponent(color)}`}
-                                        className="w-4 h-4 border border-white/40 hover:scale-125 transition-transform"
+                                        className="w-4 h-4 border border-white/40"
                                         style={{ backgroundColor: color }}
-                                        title={`Search for ${color}`}
-                                        onClick={(e) => e.stopPropagation()}
                                     />
                                 ))}
                             </div>

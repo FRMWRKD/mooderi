@@ -133,7 +133,8 @@ function HomePageContent() {
 
     const handleFilterChange = (filters: FilterState) => {
         setLimit(50);
-        setActiveFilters(filters);
+        // Preserve the current sort value - FilterBar sends a default sort, but user may have changed it via SortDropdown
+        setActiveFilters(prev => ({ ...filters, sort: prev.sort }));
     };
 
     const handleSearch = (query: string, type: "text" | "semantic") => {
@@ -391,16 +392,19 @@ function HomePageContent() {
                             : "flex flex-col gap-4"
                     }>
                         {images.map((image: any) => (
-                            <Link key={image._id} href={`/image/${image._id}`} className={viewMode === "list" ? "flex gap-5 p-4 bg-white/5 rounded-xl border border-border-subtle hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer" : ""}>
-                                {viewMode === "list" && (
+                            viewMode === "list" ? (
+                                // List view - wrap in Link
+                                <Link
+                                    key={image._id}
+                                    href={`/image/${image._id}`}
+                                    className="flex gap-5 p-4 bg-white/5 rounded-xl border border-border-subtle hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer"
+                                >
                                     <CachedImage
                                         src={image.imageUrl}
                                         alt={image.prompt || ""}
                                         className="w-28 h-28 rounded-lg flex-shrink-0"
                                         placeholderColor={image.colors?.[0] || "#1a1a1a"}
                                     />
-                                )}
-                                {viewMode === "list" ? (
                                     <div className="flex-1 min-w-0 flex flex-col justify-between">
                                         <div>
                                             <p className="text-base text-text-primary font-medium line-clamp-2 mb-2">{image.prompt || "Untitled"}</p>
@@ -427,19 +431,20 @@ function HomePageContent() {
                                             )}
                                         </div>
                                     </div>
-                                ) : (
-                                    <ImageCard
-                                        id={image._id}
-                                        imageUrl={image.imageUrl}
-                                        prompt={image.prompt}
-                                        mood={image.mood}
-                                        colors={image.colors}
-                                        // hasGif={!!image.gif_url} // Not in new schema?
-                                        isSelected={selectedIds.has(image._id)}
-                                        onSelect={() => toggleSelection(image._id)}
-                                    />
-                                )}
-                            </Link>
+                                </Link>
+                            ) : (
+                                // Grid view - ImageCard has its own Link, don't wrap
+                                <ImageCard
+                                    key={image._id}
+                                    id={image._id}
+                                    imageUrl={image.imageUrl}
+                                    prompt={image.prompt}
+                                    mood={image.mood}
+                                    colors={image.colors}
+                                    isSelected={selectedIds.has(image._id)}
+                                    onSelect={() => toggleSelection(image._id)}
+                                />
+                            )
                         ))}
                     </div>
                 )}

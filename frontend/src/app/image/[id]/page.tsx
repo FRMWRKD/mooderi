@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useSimilarImagesVector, useFindSimilarPrompts } from "@/hooks/useConvex";
+import { useSimilarImagesVector } from "@/hooks/useConvex";
 
 type TabType = "overview" | "analysis" | "prompts";
 
@@ -42,7 +42,6 @@ export default function ImageDetailPage({
     const image = useQuery(api.images.getById, { id: imageId });
     const existingVote = useQuery(api.images.getUserVote, { imageId }); // TC-8: Load existing vote
     const { images: vectorImages, isLoading: isVectorLoading } = useSimilarImagesVector(imageId, 12);
-    const { similarPrompts, isLoading: isRagLoading } = useFindSimilarPrompts(imageId, 6);
     const similarData = { images: vectorImages }; // Adapting to existing structure
     const voteMutation = useMutation(api.images.vote);
     const copyPromptMutation = useMutation(api.images.copyPrompt);
@@ -623,48 +622,7 @@ export default function ImageDetailPage({
                     </div >
                 </div >
 
-                {/* Similar Prompts (RAG) */}
-                {similarPrompts.length > 0 && (
-                    <div className="mt-12">
-                        <h2 className="text-xl font-semibold mb-6">Similar Prompts</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {similarPrompts.map((item: any, idx: number) => (
-                                <Link
-                                    key={item.entryId || idx}
-                                    href={`/image/${item.imageId}`}
-                                    className="group p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                                >
-                                    <div className="flex gap-4 items-start">
-                                        {item.imageUrl && (
-                                            <img
-                                                src={item.imageUrl}
-                                                alt=""
-                                                className="w-16 h-16 object-cover rounded flex-shrink-0"
-                                            />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-white/80 line-clamp-3">
-                                                {item.promptText?.substring(0, 150)}...
-                                            </p>
-                                            <div className="flex gap-2 mt-2">
-                                                {item.mood && (
-                                                    <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded">
-                                                        {item.mood}
-                                                    </span>
-                                                )}
-                                                {item.lighting && (
-                                                    <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded">
-                                                        {item.lighting}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                )}
+
 
                 {/* Similar Images */}
                 {similarImages.length > 0 && (
